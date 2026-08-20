@@ -1,25 +1,12 @@
 {
-  "version": 2,
-  "cleanUrls": true,
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "innohack/**",
-      "use": "@vercel/static"
+      "source": "/dashboard",
+      "destination": "/index.html"
     }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.py" },
-    { "src": "/", "dest": "/index.html" },
-    { "src": "/index.html", "dest": "/index.html" },
-    { "src": "/dashboard", "dest": "/index.html" },
-    { "src": "/innohack/(.*)", "dest": "/innohack/$1" }
   ]
 }
