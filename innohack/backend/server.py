@@ -1,7 +1,7 @@
 """
 Standalone Zero-Dependency HTTP API & UI Server for RoutePulse Traffic Intelligence System.
 Serves the RoutePulse HTML Dashboard directly at http://localhost:8000
-Backend endpoints for live video telemetry, traffic predictions, and route optimization.
+Backend endpoints for real YOLO live video stream, real telemetry, predictions, and routing.
 """
 import sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -23,6 +23,8 @@ opt = route_optimizer.RouteOptimizer()
 video_proc = cctv_video_processor.CCTVVideoProcessor()
 
 HTML_FILE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "traffic_dashboard.html")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(BASE_DIR)
 
 class TrafficAPIHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
@@ -54,14 +56,53 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
                 self.wfile.write(f"<h1>Error loading dashboard HTML: {e}</h1>".encode('utf-8'))
             return
 
-        # Serve Live Video Stream (MJPEG format)
+        # Select camera endpoint via GET params
+        if path == "/api/video/select_camera":
+            cam_name = query.get("name", ["RAINHAM MARSHES"])[0]
+            cam_url = query.get("url", ["https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07300.jpg"])[0]
+            video_proc.set_camera_source(cam_name, cam_url)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "SUCCESS", "camera": cam_name, "url": cam_url}).encode('utf-8'))
+            return
+
+        # Serve static asset files (e.g. logos, images)
+        rel_path = path.lstrip('/')
+        possible_paths = [
+            os.path.join(ROOT_DIR, rel_path),
+            os.path.join(BASE_DIR, rel_path)
+        ]
+        for file_path in possible_paths:
+            if os.path.isfile(file_path):
+                self.send_response(200)
+                if file_path.endswith('.png'):
+                    self.send_header('Content-Type', 'image/png')
+                elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
+                    self.send_header('Content-Type', 'image/jpeg')
+                elif file_path.endswith('.svg'):
+                    self.send_header('Content-Type', 'image/svg+xml')
+                elif file_path.endswith('.css'):
+                    self.send_header('Content-Type', 'text/css')
+                elif file_path.endswith('.js'):
+                    self.send_header('Content-Type', 'application/javascript')
+                else:
+                    self.send_header('Content-Type', 'application/octet-stream')
+                self._send_cors_headers()
+                self.end_headers()
+                with open(file_path, 'rb') as f:
+                    self.wfile.write(f.read())
+                return
+
+        # Serve Live Video Stream (MJPEG format with real YOLO annotations)
         if path == "/api/video/feed":
             self.send_response(200)
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
             self._send_cors_headers()
             self.end_headers()
             try:
-                for _ in range(50):
+                while True:
                     frame_data = video_proc.process_next_frame()
                     jpg_bytes = frame_data["jpeg_bytes"]
                     self.wfile.write(b'--frame\r\n')
@@ -70,16 +111,18 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(jpg_bytes)
                     self.wfile.write(b'\r\n')
-                    time.sleep(0.04) # ~25 FPS
+                    self.wfile.flush() # Force immediate frame delivery to browser
+                    time.sleep(0.06) # ~16 FPS live continuous video stream
             except Exception:
                 pass
             return
 
-        # Serve Live Single Video Frame JPEG
+        # Serve Live Single Video Frame JPEG with real YOLO annotations
         if path == "/api/video/frame":
             frame_data = video_proc.process_next_frame()
             self.send_response(200)
             self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(frame_data["jpeg_bytes"])
@@ -92,6 +135,7 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
             
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps(telemetry, indent=2).encode('utf-8'))
@@ -109,26 +153,18 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
             response = {
                 "status": "ONLINE",
                 "server": "RoutePulse Global Traffic Intelligence Server",
-                "system": "Predictive Traffic AI (CV + Forecasting + Routing)",
+                "system": "Real Ultralytics YOLOv8 Computer Vision Engine",
                 "endpoints": [
                     "/api/video/feed",
+                    "/api/video/frame",
                     "/api/video/telemetry",
-                    "/api/traffic/live",
-                    "/api/traffic/predict",
-                    "/api/route/optimize"
+                    "/api/video/select_camera"
                 ]
             }
         elif path == "/api/traffic/live":
             frame_data = video_proc.process_next_frame()
             video_telemetry = {k: v for k, v in frame_data.items() if k != "jpeg_bytes"}
-
             telemetry = sim.get_live_telemetry()
-            telemetry[0]["congestion_pct"] = video_telemetry["congestion_pct"]
-            telemetry[0]["current_speed_kmh"] = video_telemetry["avg_speed_kmh"]
-            telemetry[0]["delay_min"] = video_telemetry["delay_min"]
-            telemetry[0]["status"] = video_telemetry["status"]
-            telemetry[0]["status_color"] = video_telemetry["status_color"]
-
             response = {
                 "corridors_count": len(telemetry),
                 "video_analytics": video_telemetry,
@@ -147,17 +183,28 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/api/emergency/greenwave":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
-            try:
-                body = json.loads(post_data.decode('utf-8'))
-            except Exception:
-                body = {}
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
+        try:
+            body = json.loads(post_data.decode('utf-8'))
+        except Exception:
+            body = {}
 
+        if parsed.path == "/api/video/select_camera":
+            cam_name = body.get("name", "RAINHAM MARSHES")
+            cam_url = body.get("url", "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07300.jpg")
+            video_proc.set_camera_source(cam_name, cam_url)
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "SUCCESS", "camera": cam_name, "url": cam_url}).encode('utf-8'))
+            return
+
+        if parsed.path == "/api/emergency/greenwave":
             corridor = body.get("corridor", "Silk Board Junction")
             hospital = body.get("hospital_name", "St. John's Hospital")
-
             result = opt.activate_emergency_green_wave(corridor, hospital)
 
             self.send_response(200)
@@ -169,14 +216,11 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
 def run_server(port=8000):
     server_address = ('', port)
     httpd = ThreadingHTTPServer(server_address, TrafficAPIHandler)
-    print("=================================================================")
-    print(f" [+] RoutePulse Global Server running at http://localhost:{port}")
-    print(" Press Ctrl+C to stop the server.")
-    print("=================================================================")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopping server...")
+    print(f"==================================================")
+    print(f"⚡ ROUTEPULSE REAL YOLO CV SERVER RUNNING AT:")
+    print(f"👉 http://localhost:{port}")
+    print(f"==================================================")
+    httpd.serve_forever()
 
 if __name__ == "__main__":
     run_server(8000)

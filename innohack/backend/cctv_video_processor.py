@@ -1,199 +1,261 @@
 """
-CCTV Traffic Video Processor & Computer Vision Engine
-======================================================
-Processes CCTV traffic video frames in real-time, supporting both:
-1. UA-DETRAC Traffic Sequences (Real camera images & XML annotations)
-2. Bengaluru Mobility (BMD-45) multi-vehicle simulation
-3. Pure Python + Pillow / OpenCV hybrid rendering with zero crash guarantee.
+CCTV Traffic Video Processor & Real YOLO Computer Vision Engine
+================================================================
+Processes CCTV traffic video MP4 streams frame-by-frame using real Ultralytics YOLOv8.
+Performs frame-by-frame object detection, ByteTrack tracking, NMS filtering,
+and calculates traffic density and breakdown strictly from model inference on moving video.
 """
 
 import os
 import io
 import time
-import math
-import random
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+import json
+import urllib.request
+import ssl
+from typing import Dict, Any, List
+import numpy as np
+import cv2
+from ultralytics import YOLO
 
-# Check for OpenCV or Pillow
-HAS_CV2 = False
-try:
-    import cv2
-    import numpy as np
-    HAS_CV2 = True
-except ImportError:
-    HAS_CV2 = False
+# Vehicle Traffic Weights for Density Calculation
+VEHICLE_WEIGHTS = {
+    "motorbike": 3,
+    "motorcycle": 3,
+    "bicycle": 3,
+    "car": 6,
+    "van": 7,
+    "bus": 9,
+    "truck": 9
+}
 
-from PIL import Image, ImageDraw, ImageFont
+# PCU Weights matching standard IRC definitions
+VEHICLE_PCU = {
+    "motorbike": 0.5,
+    "motorcycle": 0.5,
+    "bicycle": 0.5,
+    "car": 1.0,
+    "van": 1.2,
+    "bus": 3.0,
+    "truck": 2.5
+}
 
-# Vehicle Classes and IRC Standard PCU Weights
-VEHICLE_CLASSES = {
-    "auto": {"name": "Auto-rickshaw", "pcu": 0.8, "color": (245, 158, 11)},
-    "bike": {"name": "Motorbike", "pcu": 0.5, "color": (6, 182, 212)},
-    "car": {"name": "Car", "pcu": 1.0, "color": (99, 102, 241)},
-    "bus": {"name": "Bus", "pcu": 3.0, "color": (239, 68, 68)},
-    "truck": {"name": "Truck / Heavy", "pcu": 2.5, "color": (16, 185, 129)},
-    "van": {"name": "Van", "pcu": 1.2, "color": (20, 184, 166)}
+# Color Map for Vehicle Classes (BGR format for OpenCV)
+CLASS_COLORS = {
+    "car": (241, 102, 99),        # Indigo / Blue
+    "motorbike": (212, 182, 6),   # Cyan
+    "motorcycle": (212, 182, 6),  # Cyan
+    "bicycle": (212, 182, 6),     # Cyan
+    "van": (11, 158, 245),        # Amber
+    "bus": (68, 68, 239),         # Red
+    "truck": (129, 185, 16)       # Green
 }
 
 class CCTVVideoProcessor:
-    def __init__(self, width=720, height=405, detrac_dir=None):
-        self.width = width
-        self.height = height
+    def __init__(self, model_name="yolov8n.pt", conf_threshold=0.35):
+        self.conf_threshold = float(conf_threshold)
+        self.model_name = model_name
         self.frame_index = 0
+        self.debug_mode = True
         
-        # Check for DETRAC real images on disk
-        self.detrac_images_dir = self._find_detrac_images_dir(detrac_dir)
-        self.detrac_image_files = []
-        if self.detrac_images_dir and os.path.exists(self.detrac_images_dir):
-            self.detrac_image_files = sorted([
-                os.path.join(self.detrac_images_dir, f)
-                for f in os.listdir(self.detrac_images_dir)
-                if f.lower().endswith(('.jpg', '.jpeg', '.png'))
-            ])
-            
-        # Simulated vehicle trajectories (for fallback / live continuous motion)
-        self.vehicles = self._generate_initial_vehicles()
+        print(f"[YOLO ENGINE] Initializing Real Ultralytics YOLO Model: {model_name}...")
+        self.model = YOLO(model_name)
+        self.model_classes = self.model.names
+        print(f"[YOLO ENGINE] Model Loaded Successfully! Model Classes: {self.model_classes}")
 
-    def _find_detrac_images_dir(self, custom_path=None) -> Optional[str]:
-        candidates = [
-            custom_path,
-            "d:/Innohack/detrac_sample_data/DETRAC-train-data/MVI_20011",
-            "d:/Innohack/DETRAC-train-data/MVI_20011",
-            "../detrac_sample_data/DETRAC-train-data/MVI_20011",
-            "detrac_sample_data/DETRAC-train-data/MVI_20011"
-        ]
-        for c in candidates:
-            if c and os.path.exists(c):
-                return c
-        return None
-
-    def _generate_initial_vehicles(self) -> List[Dict[str, Any]]:
-        types = ["auto", "bike", "car", "bus", "truck", "van"]
-        weights = [0.20, 0.30, 0.25, 0.10, 0.05, 0.10]
+        # Active camera source config
+        self.current_camera_name = "RAINHAM MARSHES"
+        self.current_camera_url = "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07300.mp4"
         
-        vehicles = []
-        for i in range(16):
-            v_type = random.choices(types, weights=weights)[0]
-            lane = random.choice([0.22, 0.42, 0.62, 0.80])
-            speed = random.uniform(0.003, 0.012)
-            vehicles.append({
-                "id": f"v_{i+1}",
-                "type": v_type,
-                "x": random.uniform(0.05, 0.85),
-                "y": lane + random.uniform(-0.03, 0.03),
-                "w": 0.07 if v_type in ["auto", "bike"] else (0.16 if v_type == "bus" else 0.11),
-                "h": 0.05 if v_type in ["auto", "bike"] else (0.11 if v_type == "bus" else 0.07),
-                "speed": speed,
-                "confidence": round(random.uniform(0.88, 0.98), 2)
-            })
-        return vehicles
+        # OpenCV VideoCapture for real moving MP4 video stream
+        self.cap = None
+        self._init_video_capture(self.current_camera_url)
+
+    def _init_video_capture(self, url: str):
+        """Initializes or resets OpenCV VideoCapture for MP4 stream."""
+        if self.cap is not None:
+            try:
+                self.cap.release()
+            except Exception:
+                pass
+        
+        # Convert .jpg snapshot URLs to .mp4 video stream URLs
+        mp4_url = url
+        if mp4_url.endswith('.jpg'):
+            mp4_url = mp4_url[:-4] + '.mp4'
+        elif not mp4_url.endswith('.mp4') and 'jamcams' in mp4_url:
+            mp4_url += '.mp4'
+
+        self.current_camera_url = mp4_url
+        print(f"[YOLO ENGINE] Opening Real Video Stream: {mp4_url}")
+        self.cap = cv2.VideoCapture(mp4_url)
+        self.frame_index = 0
+
+    def set_camera_source(self, name: str, image_url: str):
+        """Dynamically updates active CCTV camera stream source."""
+        if name:
+            self.current_camera_name = str(name).upper()
+        if image_url:
+            self._init_video_capture(image_url)
+        print(f"[YOLO ENGINE] Switched Active Video Camera: {self.current_camera_name} -> {self.current_camera_url}")
 
     def process_next_frame(self) -> Dict[str, Any]:
-        """Advances video processing by 1 frame and returns telemetry + JPEG bytes."""
+        """
+        Reads consecutive frame from MP4 video stream, runs real YOLO inference & ByteTrack tracking,
+        filters detections, draws bounding boxes on moving vehicles, and calculates stats.
+        """
+        t_start = time.time()
         self.frame_index += 1
         
-        # If we have real DETRAC images on disk, cycle through them
-        if self.detrac_image_files:
-            file_idx = (self.frame_index - 1) % len(self.detrac_image_files)
-            img_path = self.detrac_image_files[file_idx]
-            try:
-                base_img = Image.open(img_path).convert("RGB")
-                if base_img.size != (self.width, self.height):
-                    base_img = base_img.resize((self.width, self.height), Image.Resampling.BILINEAR)
-            except Exception:
-                base_img = Image.new("RGB", (self.width, self.height), color=(25, 30, 42))
-        else:
-            base_img = Image.new("RGB", (self.width, self.height), color=(25, 30, 42))
+        frame = None
+        if self.cap is not None and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                # Loop video seamlessly when it reaches the end
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.cap.read()
 
-        draw = ImageDraw.Draw(base_img)
+        if frame is None:
+            # Generate fallback dark road test frame if video stream temporarily unavailable
+            frame = np.zeros((405, 720, 3), dtype=np.uint8)
+            frame[:] = (42, 30, 25) # Dark road background
+            cv2.rectangle(frame, (0, 100), (720, 405), (58, 46, 40), -1)
+            for y in [200, 300]:
+                for x in range(0, 720, 50):
+                    cv2.line(frame, (x, y), (x + 25, y), (180, 180, 180), 2)
 
-        # If synthetic frame, draw road lanes
-        if not self.detrac_image_files:
-            draw.rectangle([0, int(self.height * 0.15), self.width, self.height], fill=(40, 46, 58))
-            for y_pct in [0.35, 0.55, 0.75]:
-                y_pos = int(self.height * y_pct)
-                dash_offset = (self.frame_index * 8) % 40
-                for x in range(-dash_offset, self.width, 40):
-                    draw.line([(x, y_pos), (x + 20, y_pos)], fill=(180, 180, 180), width=2)
+        h, w, _ = frame.shape
+        
+        # 2. Run Real YOLO Inference + ByteTrack Tracking on Moving Video Frame
+        t_infer_start = time.time()
+        # Vehicle class IDs in COCO: 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
+        vehicle_cls_ids = [1, 2, 3, 5, 7]
+        
+        results = self.model.track(
+            frame,
+            persist=True,
+            conf=self.conf_threshold,
+            iou=0.45,
+            classes=vehicle_cls_ids,
+            verbose=False
+        )
+        t_infer = (time.time() - t_infer_start) * 1000.0 # ms
 
-        counts = {"auto": 0, "bike": 0, "car": 0, "bus": 0, "truck": 0, "van": 0}
+        # 3. Extract & Filter Real Detections
+        boxes = results[0].boxes if len(results) > 0 else []
+        raw_detections_count = len(boxes)
+
+        tracked_objects = []
+        counts = {"car": 0, "motorbike": 0, "bus": 0, "truck": 0, "van": 0}
         total_pcu = 0.0
-        active_boxes = []
+        total_weighted_density = 0
 
-        # Update vehicle positions & bounding boxes
-        for v in self.vehicles:
-            v["x"] += v["speed"]
-            if v["x"] > 1.05:
-                v["x"] = -0.15
-                v["type"] = random.choice(["auto", "bike", "car", "bus", "truck", "van"])
-                v["speed"] = random.uniform(0.003, 0.012)
-                v["confidence"] = round(random.uniform(0.88, 0.98), 2)
+        annotated_frame = frame.copy()
 
-            counts[v["type"]] += 1
-            pcu_val = VEHICLE_CLASSES[v["type"]]["pcu"]
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            raw_class_name = self.model_classes.get(cls_id, "car").lower()
+            conf = float(box.conf[0])
+
+            # Class mapping
+            v_type = raw_class_name
+            if raw_class_name in ["motorcycle", "bicycle"]:
+                v_type = "motorbike"
+
+            # Check bounding box dimensions to identify vans vs cars/trucks
+            xyxy_arr = box.xyxy[0].cpu().numpy()
+            x1, y1, x2, y2 = int(xyxy_arr[0]), int(xyxy_arr[1]), int(xyxy_arr[2]), int(xyxy_arr[3])
+            box_w = x2 - x1
+            box_h = y2 - y1
+
+            if v_type == "truck" and box_w < w * 0.20 and box_h < h * 0.20:
+                v_type = "van"
+
+            # Check ROI (Region of Interest: Road Surface y > 10% of frame)
+            cy = (y1 + y2) / 2.0
+            if cy < (h * 0.08):
+                continue # Skip non-road sky/tree detections
+
+            track_id = int(box.id[0]) if (box.id is not None and len(box.id) > 0) else None
+
+            # Calculate vehicle weights
+            pcu_val = float(VEHICLE_PCU.get(v_type, 1.0))
+            density_weight = int(VEHICLE_WEIGHTS.get(v_type, 6))
+
+            counts[v_type] = counts.get(v_type, 0) + 1
             total_pcu += pcu_val
+            total_weighted_density += density_weight
 
-            x1 = int(v["x"] * self.width)
-            y1 = int(v["y"] * self.height)
-            w_px = int(v["w"] * self.width)
-            h_px = int(v["h"] * self.height)
-            x2 = x1 + w_px
-            y2 = y1 + h_px
-
-            color_rgb = VEHICLE_CLASSES[v["type"]]["color"]
-
-            # Draw box on frame
-            draw.rectangle([x1, y1, x2, y2], outline=color_rgb, width=2)
-            label = f"{VEHICLE_CLASSES[v['type']]['name']} {int(v['confidence']*100)}%"
-            draw.text((x1, max(y1 - 14, 5)), label, fill=color_rgb)
-
-            active_boxes.append({
-                "id": v["id"],
-                "class": VEHICLE_CLASSES[v["type"]]["name"],
-                "type": v["type"],
-                "x": round(v["x"], 3),
-                "y": round(v["y"], 3),
+            tracked_objects.append({
+                "track_id": track_id,
+                "class": str(v_type.capitalize()),
+                "type": str(v_type),
+                "confidence": round(conf, 2),
+                "box": [x1, y1, x2, y2],
                 "pcu": pcu_val,
-                "conf": v["confidence"]
+                "weight": density_weight
             })
 
-        # Draw CCTV HUD Text Overlay
-        source_label = "UA-DETRAC CAM-MVI20011" if self.detrac_image_files else "LIVE CCTV [CAM-3049 SILK BOARD]"
-        draw.text((15, 12), f"{source_label} | FRAME {self.frame_index:05d}", fill=(50, 220, 150))
-        draw.text((15, 28), f"AI DETECTIONS: {len(self.vehicles)} VEHICLES | PCU LOAD: {round(total_pcu, 1)}", fill=(242, 169, 59))
+            # 4. Draw REAL Bounding Boxes and Tracking IDs on Video Frame
+            color = CLASS_COLORS.get(v_type, (241, 102, 99))
 
-        # Congestion calculation
-        capacity_threshold = 28.0
-        congestion_pct = min(100.0, round((total_pcu / capacity_threshold) * 100.0, 1))
-        avg_speed_kmh = round(max(8.0, 48.0 * (1.0 - (congestion_pct / 120.0))), 1)
-        delay_min = round(max(1.2, (50.0 / avg_speed_kmh) * 5.0), 1)
+            # Main bounding box
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
 
-        if congestion_pct < 45.0:
-            status = "CLEAR"
-            color = "#37C871"
-        elif congestion_pct < 75.0:
-            status = "MODERATE"
-            color = "#F2A93B"
-        else:
-            status = "HEAVY"
-            color = "#FF5C5C"
+            # High-tech corner anchors
+            c_len = max(4, min(10, box_w // 3))
+            cv2.line(annotated_frame, (x1, y1), (x1 + c_len, y1), color, 3)
+            cv2.line(annotated_frame, (x1, y1), (x1, y1 + c_len), color, 3)
 
-        # Encode frame to JPEG in memory
-        buf = io.BytesIO()
-        base_img.save(buf, format="JPEG", quality=85)
-        jpeg_bytes = buf.getvalue()
+            cv2.line(annotated_frame, (x2 - c_len, y1), (x2, y1), color, 3)
+            cv2.line(annotated_frame, (x2, y1), (x2, y1 + c_len), color, 3)
+
+            cv2.line(annotated_frame, (x1, y2 - c_len), (x1, y2), color, 3)
+            cv2.line(annotated_frame, (x1, y2), (x1 + c_len, y2), color, 3)
+
+            cv2.line(annotated_frame, (x2 - c_len, y2), (x2, y2), color, 3)
+            cv2.line(annotated_frame, (x2, y2 - c_len), (x2, y2), color, 3)
+
+            # Label text with Class Name, Persistent Track ID, and Real Confidence %
+            id_str = f" #{track_id}" if track_id is not None else ""
+            label_str = f"{v_type.capitalize()}{id_str} {int(conf * 100)}%"
+
+            # Label background box
+            (txt_w, txt_h), _ = cv2.getTextSize(label_str, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+            lbl_y1 = max(y1 - txt_h - 6, 0)
+            cv2.rectangle(annotated_frame, (x1, lbl_y1), (x1 + txt_w + 8, lbl_y1 + txt_h + 6), color, -1)
+            cv2.putText(annotated_frame, label_str, (x1 + 4, lbl_y1 + txt_h + 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (10, 14, 23), 1, cv2.LINE_AA)
+
+        # 5. Draw HUD & Debug Overlay on Video Frame
+        cv2.rectangle(annotated_frame, (10, 10), (w - 10, 40), (15, 10, 10), -1)
+        cv2.rectangle(annotated_frame, (10, 10), (w - 10, 40), (55, 200, 113), 1)
+
+        hud_text = f"● REC | {self.current_camera_name[:28]} | REAL MP4 VIDEO YOLOv8"
+        cv2.putText(annotated_frame, hud_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (113, 200, 55), 1, cv2.LINE_AA)
+
+        t_total_ms = (time.time() - t_start) * 1000.0
+        fps = round(1000.0 / max(1.0, t_total_ms), 1)
+
+        if self.debug_mode:
+            debug_str = f"FPS: {fps} | Infer: {int(t_infer)}ms | Raw: {raw_detections_count} | Valid: {len(tracked_objects)} | Conf: {self.conf_threshold} | Model: {self.model_name}"
+            cv2.rectangle(annotated_frame, (10, h - 30), (w - 10, h - 8), (10, 10, 15), -1)
+            cv2.putText(annotated_frame, debug_str, (15, h - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (242, 169, 59), 1, cv2.LINE_AA)
+
+        # Encode frame to JPEG
+        _, jpeg_buf = cv2.imencode('.jpg', annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        jpeg_bytes = jpeg_buf.tobytes()
 
         return {
-            "frame_index": self.frame_index,
-            "total_vehicles": len(self.vehicles),
-            "counts": counts,
-            "total_pcu": round(total_pcu, 1),
-            "congestion_pct": congestion_pct,
-            "avg_speed_kmh": avg_speed_kmh,
-            "delay_min": delay_min,
-            "status": status,
-            "status_color": color,
-            "boxes": active_boxes,
+            "frame_id": int(self.frame_index),
+            "fps": float(fps),
+            "inference_time_ms": float(round(t_infer, 1)),
+            "camera_name": str(self.current_camera_name),
+            "model_name": str(self.model_name),
+            "confidence_threshold": float(self.conf_threshold),
+            "raw_detections_count": int(raw_detections_count),
+            "total_tracked_vehicles": int(len(tracked_objects)),
+            "vehicle_counts": counts,
+            "total_pcu_load": float(round(total_pcu, 1)),
+            "weighted_density": int(total_weighted_density),
+            "tracked_objects": tracked_objects,
             "jpeg_bytes": jpeg_bytes
         }

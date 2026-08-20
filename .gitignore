@@ -49,3 +49,8 @@ Thumbs.db
 data/
 datasets/
 Enriched Traffic Datasets for Madrid/
+
+# Scratch & test outputs
+scratch/
+test_inference_output/
+logo_base64.txt
