@@ -51,7 +51,7 @@ CLASS_COLORS = {
 }
 
 class CCTVVideoProcessor:
-    def __init__(self, model_name="yolov8n.pt", conf_threshold=0.35):
+    def __init__(self, model_name="yolov8n.pt", conf_threshold=0.20):
         self.conf_threshold = float(conf_threshold)
         self.model_name = model_name
         self.frame_index = 0
@@ -71,27 +71,19 @@ class CCTVVideoProcessor:
         self._init_video_capture(self.current_camera_url)
 
     def _init_video_capture(self, url: str):
-        """Initializes or resets OpenCV VideoCapture for MP4 stream."""
+        """Initializes or updates camera URL source instantly."""
         if self.cap is not None:
             try:
                 self.cap.release()
             except Exception:
                 pass
-        
-        # Convert .jpg snapshot URLs to .mp4 video stream URLs
-        mp4_url = url
-        if mp4_url.endswith('.jpg'):
-            mp4_url = mp4_url[:-4] + '.mp4'
-        elif not mp4_url.endswith('.mp4') and 'jamcams' in mp4_url:
-            mp4_url += '.mp4'
-
-        self.current_camera_url = mp4_url
-        print(f"[YOLO ENGINE] Opening Real Video Stream: {mp4_url}")
-        self.cap = cv2.VideoCapture(mp4_url)
+            self.cap = None
+        self.current_camera_url = url
         self.frame_index = 0
+        print(f"[YOLO ENGINE] Set Active Video Camera Source: {url}")
 
     def set_camera_source(self, name: str, image_url: str):
-        """Dynamically updates active CCTV camera stream source."""
+        """Dynamically updates active CCTV camera stream source with zero latency."""
         if name:
             self.current_camera_name = str(name).upper()
         if image_url:
@@ -100,22 +92,37 @@ class CCTVVideoProcessor:
 
     def process_next_frame(self) -> Dict[str, Any]:
         """
-        Reads consecutive frame from MP4 video stream, runs real YOLO inference & ByteTrack tracking,
-        filters detections, draws bounding boxes on moving vehicles, and calculates stats.
+        Reads frame from live camera stream, runs real Ultralytics YOLOv8 inference & tracking,
+        filters vehicle detections, draws bounding boxes, and calculates PCU stats.
         """
         t_start = time.time()
         self.frame_index += 1
         
         frame = None
-        if self.cap is not None and self.cap.isOpened():
+
+        # 1. Fetch live camera snapshot directly via HTTP if network URL
+        if self.current_camera_url and (self.current_camera_url.startswith("http://") or self.current_camera_url.startswith("https://")):
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(self.current_camera_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=2, context=ctx) as resp:
+                    img_data = resp.read()
+                    arr = np.frombuffer(img_data, np.uint8)
+                    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            except Exception:
+                frame = None
+
+        # 2. Fallback to OpenCV VideoCapture if local video file or RTSP stream
+        if frame is None and self.cap is not None and self.cap.isOpened():
             ret, frame = self.cap.read()
             if not ret or frame is None:
-                # Loop video seamlessly when it reaches the end
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = self.cap.read()
 
+        # 3. Fallback dark canvas if stream temporarily unreachable
         if frame is None:
-            # Generate fallback dark road test frame if video stream temporarily unavailable
             frame = np.zeros((405, 720, 3), dtype=np.uint8)
             frame[:] = (42, 30, 25) # Dark road background
             cv2.rectangle(frame, (0, 100), (720, 405), (58, 46, 40), -1)
