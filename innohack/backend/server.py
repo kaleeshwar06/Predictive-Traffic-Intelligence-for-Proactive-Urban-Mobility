@@ -1,9 +1,10 @@
 """
-Standalone Zero-Dependency HTTP API & UI Server for AI/ML-09 Traffic Congestion System.
-Runs CCTV & UA-DETRAC Video Processor Engine to calculate live vehicle counts, PCU density,
-and congestion levels frame-by-frame directly from traffic video monitoring.
+Standalone Zero-Dependency HTTP API & UI Server for RoutePulse Traffic Intelligence System.
 Serves the RoutePulse HTML Dashboard directly at http://localhost:8000
+Backend endpoints for live video telemetry, traffic predictions, and route optimization.
 """
+import sys
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import json
 import os
@@ -11,15 +12,11 @@ import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-import bmd45_pipeline
-import detrac_pipeline
 import iot_simulator
 import predictor
 import route_optimizer
 import cctv_video_processor
 
-pipe = bmd45_pipeline.BMD45Pipeline()
-detrac_pipe = detrac_pipeline.DETRACPipeline()
 sim = iot_simulator.IoTSimulator()
 pred = predictor.TrafficPredictor()
 opt = route_optimizer.RouteOptimizer()
@@ -111,16 +108,13 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
         if path == "/api" or path == "/api/info":
             response = {
                 "status": "ONLINE",
-                "server": "CCTV & UA-DETRAC Traffic Processing Server",
-                "system": "Traffic Congestion AI Engine (AI/ML-09)",
+                "server": "RoutePulse Global Traffic Intelligence Server",
+                "system": "Predictive Traffic AI (CV + Forecasting + Routing)",
                 "endpoints": [
                     "/api/video/feed",
                     "/api/video/telemetry",
                     "/api/traffic/live",
                     "/api/traffic/predict",
-                    "/api/detrac/sample",
-                    "/api/detrac/sequences",
-                    "/api/camera/sample",
                     "/api/route/optimize"
                 ]
             }
@@ -140,22 +134,9 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
                 "video_analytics": video_telemetry,
                 "telemetry": telemetry
             }
-        elif path == "/api/detrac/sample":
-            seq = query.get("seq", ["MVI_20011"])[0]
-            f_num = int(query.get("frame", [1])[0])
-            response = detrac_pipe.get_sample_telemetry(seq, f_num)
-        elif path == "/api/detrac/sequences":
-            response = {
-                "dataset": "UA-DETRAC Benchmark",
-                "available_sequences": detrac_pipe.cached_sequences,
-                "base_dir": str(detrac_pipe.base_dir)
-            }
         elif path == "/api/traffic/predict":
             telemetry = sim.get_live_telemetry()
             response = pred.get_citywide_forecast(telemetry)
-        elif path == "/api/camera/sample":
-            sample_id = query.get("sample_id", [None])[0]
-            response = pipe.get_cctv_sample(sample_id)
         elif path == "/api/route/optimize":
             route_id = query.get("route_id", [None])[0]
             response = opt.calculate_optimized_route(route_id)
@@ -189,7 +170,7 @@ def run_server(port=8000):
     server_address = ('', port)
     httpd = HTTPServer(server_address, TrafficAPIHandler)
     print("=================================================================")
-    print(f" [+] CCTV & UA-DETRAC Video Processing Server running at http://localhost:{port}")
+    print(f" [+] RoutePulse Global Server running at http://localhost:{port}")
     print(" Press Ctrl+C to stop the server.")
     print("=================================================================")
     try:
