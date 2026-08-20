@@ -106,7 +106,7 @@ class CCTVVideoProcessor:
                         ctx.check_hostname = False
                         ctx.verify_mode = ssl.CERT_NONE
                         req = urllib.request.Request(mp4_url, headers={'User-Agent': 'Mozilla/5.0'})
-                        with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
+                        with urllib.request.urlopen(req, timeout=1, context=ctx) as resp:
                             vid_bytes = resp.read()
                             with open(temp_mp4, "wb") as f:
                                 f.write(vid_bytes)
