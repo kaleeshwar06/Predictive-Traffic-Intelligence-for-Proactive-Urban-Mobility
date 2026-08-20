@@ -1876,6 +1876,14 @@
       }
     }
 
+    // Keep live video feed playing continuously without freezing
+    setInterval(() => {
+      const img = document.getElementById('liveImg');
+      if (img && img.style.display !== 'none') {
+        img.src = '/api/video/feed?t=' + Date.now();
+      }
+    }, 200);
+
     setInterval(syncYoloTelemetry, 1000);
     syncYoloTelemetry();
   })();

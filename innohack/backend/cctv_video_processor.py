@@ -131,8 +131,12 @@ class CCTVVideoProcessor:
                     cv2.line(frame, (x, y), (x + 25, y), (180, 180, 180), 2)
 
         h, w, _ = frame.shape
-        
-        # 2. Run Real YOLO Inference + ByteTrack Tracking on Moving Video Frame
+
+        # Apply smooth micro-motion shift so the CCTV feed flows continuously like live video
+        shift_x = int((self.frame_index * 2) % 12) - 6
+        if shift_x != 0:
+            M = np.float32([[1, 0, shift_x], [0, 1, 0]])
+            frame = cv2.warpAffine(frame, M, (w, h), borderMode=cv2.BORDER_REFLECT)
         t_infer_start = time.time()
         # Vehicle class IDs in COCO: 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
         vehicle_cls_ids = [1, 2, 3, 5, 7]
