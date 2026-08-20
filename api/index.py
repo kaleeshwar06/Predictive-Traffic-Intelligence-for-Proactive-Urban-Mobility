@@ -47,7 +47,9 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        path = parsed.path
+        path = parsed.path.rstrip('/')
+        if not path:
+            path = '/'
         query = parse_qs(parsed.query)
 
         # 1. Select Camera Source Endpoint
