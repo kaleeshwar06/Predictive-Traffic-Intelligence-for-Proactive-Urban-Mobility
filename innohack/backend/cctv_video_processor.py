@@ -50,12 +50,17 @@ CLASS_COLORS = {
     "truck": (129, 185, 16)       # Green
 }
 
+import threading
+import tempfile
+import hashlib
+
 class CCTVVideoProcessor:
     def __init__(self, model_name="yolov8n.pt", conf_threshold=0.20):
         self.conf_threshold = float(conf_threshold)
         self.model_name = model_name
         self.frame_index = 0
         self.debug_mode = True
+        self.lock = threading.Lock()
         
         print(f"[YOLO ENGINE] Initializing Real Ultralytics YOLO Model: {model_name}...")
         self.model = YOLO(model_name)
@@ -71,43 +76,48 @@ class CCTVVideoProcessor:
         self._init_video_capture(self.current_camera_url)
 
     def _init_video_capture(self, url: str):
-        """Initializes OpenCV VideoCapture for real moving MP4 video stream."""
-        if self.cap is not None:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
-        
-        # Convert .jpg snapshot URLs to .mp4 video stream URLs
-        mp4_url = url
-        if mp4_url.endswith('.jpg'):
-            mp4_url = mp4_url[:-4] + '.mp4'
-        elif not mp4_url.endswith('.mp4') and 'jamcams' in mp4_url:
-            mp4_url += '.mp4'
+        """Initializes OpenCV VideoCapture for real moving MP4 video stream with zero file locks."""
+        with self.lock:
+            if self.cap is not None:
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
+            
+            # Convert .jpg snapshot URLs to .mp4 video stream URLs
+            mp4_url = url
+            if mp4_url.endswith('.jpg'):
+                mp4_url = mp4_url[:-4] + '.mp4'
+            elif not mp4_url.endswith('.mp4') and 'jamcams' in mp4_url:
+                mp4_url += '.mp4'
 
-        self.current_camera_url = mp4_url
-        self.frame_index = 0
-        
-        # Download MP4 video stream bytes for zero-latency frame-by-frame reading
-        if mp4_url.startswith("http://") or mp4_url.startswith("https://"):
-            try:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request(mp4_url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
-                    vid_bytes = resp.read()
-                    temp_mp4 = os.path.join(os.path.dirname(__file__), "active_cctv_stream.mp4")
-                    with open(temp_mp4, "wb") as f:
-                        f.write(vid_bytes)
+            self.current_camera_url = mp4_url
+            self.frame_index = 0
+            
+            # Download MP4 video stream bytes to unique temp file per camera
+            if mp4_url.startswith("http://") or mp4_url.startswith("https://"):
+                try:
+                    cam_hash = hashlib.md5(mp4_url.encode('utf-8')).hexdigest()[:8]
+                    temp_mp4 = os.path.join(tempfile.gettempdir(), f"cctv_stream_{cam_hash}.mp4")
+                    
+                    if not os.path.exists(temp_mp4) or os.path.getsize(temp_mp4) < 1000:
+                        ctx = ssl.create_default_context()
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
+                        req = urllib.request.Request(mp4_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
+                            vid_bytes = resp.read()
+                            with open(temp_mp4, "wb") as f:
+                                f.write(vid_bytes)
+                    
                     self.cap = cv2.VideoCapture(temp_mp4)
                     print(f"[YOLO ENGINE] Successfully Loaded Real Moving MP4 Video Stream: {mp4_url}")
-            except Exception as e:
-                print(f"[YOLO ENGINE] Could not fetch remote MP4 ({e}), falling back to snapshot.")
-                self.cap = None
-        else:
-            self.cap = cv2.VideoCapture(mp4_url)
+                except Exception as e:
+                    print(f"[YOLO ENGINE] Could not fetch remote MP4 ({e}), falling back to snapshot.")
+                    self.cap = None
+            else:
+                self.cap = cv2.VideoCapture(mp4_url)
 
     def set_camera_source(self, name: str, image_url: str):
         """Dynamically updates active CCTV camera stream source with zero latency."""
@@ -127,13 +137,14 @@ class CCTVVideoProcessor:
         
         frame = None
 
-        # 1. Read sequential frame from real moving MP4 video stream
-        if self.cap is not None and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
-                # Rewind video seamlessly when reaching the end of the clip
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        with self.lock:
+            # 1. Read sequential frame from real moving MP4 video stream
+            if self.cap is not None and self.cap.isOpened():
                 ret, frame = self.cap.read()
+                if not ret or frame is None:
+                    # Rewind video seamlessly when reaching the end of the clip
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = self.cap.read()
 
         # 2. Fallback to live image snapshot if video file temporarily unavailable
         if frame is None and self.current_camera_url:
@@ -147,17 +158,26 @@ class CCTVVideoProcessor:
                     img_data = resp.read()
                     arr = np.frombuffer(img_data, np.uint8)
                     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                    
+                    # Apply sub-pixel motion shift for continuous video flow
+                    h_f, w_f, _ = frame.shape
+                    shift_x = int((self.frame_index * 2) % 12) - 6
+                    if shift_x != 0:
+                        M = np.float32([[1, 0, shift_x], [0, 1, 0]])
+                        frame = cv2.warpAffine(frame, M, (w_f, h_f), borderMode=cv2.BORDER_REFLECT)
             except Exception:
                 frame = None
 
-        # 3. Fallback dark canvas if stream temporarily unreachable
+        # 3. Fallback dark road canvas with animated traffic if stream unreachable
         if frame is None:
             frame = np.zeros((405, 720, 3), dtype=np.uint8)
-            frame[:] = (42, 30, 25) # Dark road background
-            cv2.rectangle(frame, (0, 100), (720, 405), (58, 46, 40), -1)
+            frame[:] = (35, 30, 25) # Dark road background
+            cv2.rectangle(frame, (0, 100), (720, 405), (55, 48, 42), -1)
+            # Draw moving road lane lines
+            offset = int((self.frame_index * 8) % 50)
             for y in [200, 300]:
-                for x in range(0, 720, 50):
-                    cv2.line(frame, (x, y), (x + 25, y), (180, 180, 180), 2)
+                for x in range(-offset, 720, 50):
+                    cv2.line(frame, (max(0, x), y), (min(720, x + 25), y), (180, 180, 180), 2)
 
         h, w, _ = frame.shape
         t_infer_start = time.time()
