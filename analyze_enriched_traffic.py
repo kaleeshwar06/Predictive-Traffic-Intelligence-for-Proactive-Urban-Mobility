@@ -28,9 +28,9 @@ plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.
 plt.rcParams['font.sans-serif'] = 'DejaVu Sans'
 plt.rcParams['figure.dpi'] = 150
 
-# Automatically locate dataset files
-ROOT_DIR = Path(r"d:\Innohack\Enriched Traffic Datasets for Madrid")
-CHARTS_DIR = Path(r"d:\Innohack\traffic_analysis_charts")
+BASE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BASE_DIR / "Enriched Traffic Datasets for Madrid"
+CHARTS_DIR = BASE_DIR / "traffic_analysis_charts"
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 def find_file(filename):

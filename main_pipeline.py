@@ -16,8 +16,11 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
+from pathlib import Path
+
 # Add backend directory to path
-sys.path.append(r"d:\Innohack\innohack\backend")
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.append(str(BASE_DIR / "innohack" / "backend"))
 
 # ---------------------------------------------------------
 # IMPORT ALL 5 MODULES
@@ -32,7 +35,7 @@ class UnifiedForecaster:
     def __init__(self):
         try:
             from predictor_mtd import MTDTrafficForecaster
-            self.model = MTDTrafficForecaster(r"d:\Innohack\models\model1_traffic_forecaster.npz")
+            self.model = MTDTrafficForecaster(str(BASE_DIR / "models" / "model1_traffic_forecaster.npz"))
             self.use_real = True
         except Exception:
             self.use_real = False

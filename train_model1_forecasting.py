@@ -31,14 +31,14 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-# Ensure directories exist
-MODELS_DIR = Path(r"d:\Innohack\models")
+BASE_DIR = Path(__file__).resolve().parent
+MODELS_DIR = BASE_DIR / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
-CHARTS_DIR = Path(r"d:\Innohack\traffic_analysis_charts")
+CHARTS_DIR = BASE_DIR / "traffic_analysis_charts"
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Locate dataset files
-ROOT_DIR = Path(r"d:\Innohack\Enriched Traffic Datasets for Madrid")
+ROOT_DIR = BASE_DIR / "Enriched Traffic Datasets for Madrid"
 
 def find_file(filename):
     for root, dirs, files in os.walk(ROOT_DIR):

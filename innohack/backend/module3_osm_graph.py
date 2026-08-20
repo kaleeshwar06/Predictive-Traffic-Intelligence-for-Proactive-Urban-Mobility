@@ -166,7 +166,10 @@ if __name__ == "__main__":
     free_flow_time = osm_graph.calculate_free_flow_time("N1", "N2")
     print(f"    - Base Free-Flow Time: {free_flow_time:.1f} seconds")
     
-    output_path = r"d:\Innohack\models\module3_osm_graph.json"
+    import os
+    base_models = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models")
+    os.makedirs(base_models, exist_ok=True)
+    output_path = os.path.join(base_models, "module3_osm_graph.json")
     osm_graph.export_to_json(output_path)
     print(f"\n[+] Successfully exported OSM Graph Database to: {output_path}")
     print("=========================================================")

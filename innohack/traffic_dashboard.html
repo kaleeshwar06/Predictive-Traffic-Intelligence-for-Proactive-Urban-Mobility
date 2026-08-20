@@ -116,12 +116,35 @@
   .density-bar-track{ height:6px; background:var(--panel-alt); border-radius:4px; overflow:hidden; }
   .density-bar-fill{ height:100%; border-radius:4px; transition: width 0.3s ease; }
 
-  /* Route Planner Tab Inputs */
-  .search-field { display:flex; align-items:center; gap:10px; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding: 13px 16px; margin-bottom: 12px; }
+  /* Route Planner Tab Inputs & Autocomplete */
+  .search-field-wrapper { position: relative; margin-bottom: 12px; }
+  .search-field { display:flex; align-items:center; gap:10px; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding: 13px 16px; margin-bottom: 0; }
+  .search-field:focus-within { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
   .search-field svg { flex-shrink:0; opacity:0.55; }
   .search-field input { background:none; border:none; outline:none; color:var(--text); font-family: var(--font-body); font-size:14px; width:100%; }
+
+  .autocomplete-results {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    max-height: 240px; overflow-y: auto; z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8); display: none;
+  }
+  .autocomplete-item {
+    padding: 10px 14px; font-size: 13px; color: var(--text);
+    border-bottom: 1px solid var(--line-soft); cursor: pointer;
+    display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;
+  }
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover { background: var(--panel-alt); color: var(--amber); }
+  .autocomplete-icon {
+    width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; color: var(--amber);
+  }
+  .autocomplete-text-container { flex: 1; overflow: hidden; }
+  .autocomplete-title { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .autocomplete-item:hover .autocomplete-title { color: var(--amber); }
+  .autocomplete-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   
-  .find-btn { font-family: var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; background: linear-gradient(135deg, var(--amber), #d18f28); color:#0A0E17; border:none; border-radius:10px; padding: 14px; width: 100%; cursor:pointer; display:flex; align-items:center; justify-content: center; gap:8px; margin-bottom: 16px; }
+  .find-btn { font-family: var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; background: linear-gradient(135deg, var(--amber), #d18f28); color:#0A0E17; border:none; border-radius:10px; padding: 14px; width: 100%; cursor:pointer; display:flex; align-items:center; justify-content: center; gap:8px; margin-bottom: 16px; margin-top: 6px; }
   .find-btn:hover { filter:brightness(1.08); transform: translateY(-1px); }
 
   /* Route Cards */
@@ -134,9 +157,50 @@
   .route-congestion-bar{ height:5px; border-radius:3px; background:var(--panel); margin-top:10px; overflow:hidden; }
 
   /* Custom Leaflet Markers */
-  .custom-marker { background: #0A0E17; border: 1px solid #4C8DFF; border-radius: 20px; padding: 4px 10px; color: #4C8DFF; font-family: var(--font-mono); font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; cursor: pointer; }
-  .custom-marker:hover { background: #121826; border-color: #F2A93B; color: #F2A93B; z-index: 1000 !important; }
+  .custom-marker { background: #0A0E17; border: 1px solid #4C8DFF; border-radius: 16px; padding: 3px 8px; color: #4C8DFF; font-family: var(--font-mono); font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; cursor: pointer; transition: all 0.3s ease; }
+  .custom-marker:hover { background: #121826; border-color: #F2A93B; color: #F2A93B; opacity: 1 !important; z-index: 9999 !important; }
   .custom-marker svg { width: 12px; height: 12px; }
+
+  /* Highlighted key cameras on main selected route */
+  .custom-marker.cam-main-route {
+    background: #102418 !important;
+    border: 2px solid #37C871 !important;
+    color: #37C871 !important;
+    box-shadow: 0 0 14px rgba(55, 200, 113, 0.75) !important;
+    opacity: 1 !important;
+    transform: scale(1.05);
+  }
+
+  /* Key cameras along alternative routes */
+  .custom-marker.cam-alt-route {
+    background: #241D12 !important;
+    border: 1.5px solid #F2A93B !important;
+    color: #F2A93B !important;
+    box-shadow: 0 0 10px rgba(242, 169, 59, 0.4) !important;
+    opacity: 0.85 !important;
+  }
+
+  /* Clear & Reset Buttons */
+  .clear-input-btn {
+    background: none; border: none; color: var(--text-dim); font-size: 16px; line-height: 1;
+    cursor: pointer; padding: 2px 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; opacity: 0.6; flex-shrink: 0;
+  }
+  .clear-input-btn:hover { color: var(--red); opacity: 1; background: rgba(255, 92, 92, 0.15); }
+
+  .clear-route-btn {
+    font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.5px;
+    background: var(--panel-alt); color: var(--red); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .clear-route-btn:hover { background: var(--red-dim); border-color: var(--red); color: #FFF; transform: translateY(-1px); }
+
+  /* Off-route cameras (completely hidden) */
+  .custom-marker.cam-off-route {
+    display: none !important;
+    opacity: 0 !important;
+  }
 
 </style>
 </head>
@@ -229,19 +293,34 @@
 
       <!-- Route Planner Content (Restored Original Style) -->
       <div id="tab-planner" class="tab-content">
-        <div class="search-field">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C8DFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-          <input type="text" id="originInput" value="Piccadilly Circus, London" placeholder="Origin...">
+        <div class="search-field-wrapper">
+          <div class="search-field">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C8DFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+            <input type="text" id="originInput" value="Piccadilly Circus, London" placeholder="Type origin location..." autocomplete="off">
+            <button type="button" class="clear-input-btn" onclick="clearInput('originInput', 'originResults')" title="Clear origin">&times;</button>
+          </div>
+          <div class="autocomplete-results" id="originResults"></div>
         </div>
-        <div class="search-field">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          <input type="text" id="destInput" value="Heathrow Airport, London" placeholder="Destination...">
+
+        <div class="search-field-wrapper">
+          <div class="search-field">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <input type="text" id="destInput" value="Heathrow Airport, London" placeholder="Type destination location..." autocomplete="off">
+            <button type="button" class="clear-input-btn" onclick="clearInput('destInput', 'destResults')" title="Clear destination">&times;</button>
+          </div>
+          <div class="autocomplete-results" id="destResults"></div>
         </div>
         
-        <button class="find-btn" onclick="calculateRoute()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0E17" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          FIND OPTIMIZED ROUTE
-        </button>
+        <div style="display:flex; gap:10px; margin-bottom: 16px; margin-top: 6px;">
+          <button class="find-btn" style="flex:1; margin:0;" onclick="calculateRoute()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0E17" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            FIND OPTIMIZED ROUTE
+          </button>
+          <button class="clear-route-btn" onclick="resetRouteAndCameras()" title="Reset inputs and reveal all map cameras">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            RESET
+          </button>
+        </div>
 
         <div id="routeResults" style="display:none;">
           <div class="route-card best" id="card-0" onclick="drawSelectedRoute(0)">
@@ -300,12 +379,16 @@
     let currentRouteLine = null;
     let globalRoutes = [];
 
+    let allCamMarkers = [];
+    let routeLayers = [];
+
     async function loadTfLCameras() {
       try {
         const res = await fetch("https://api.tfl.gov.uk/Place/Type/JamCam");
         const data = await res.json();
         
         let camsLoaded = 0;
+        allCamMarkers = [];
         data.forEach(cam => {
           let videoUrl = '', imageUrl = '';
           if(cam.additionalProperties) {
@@ -319,6 +402,7 @@
             marker.on('click', () => {
               selectCamera(cam.commonName, videoUrl, imageUrl);
             });
+            allCamMarkers.push({ marker: marker, lat: cam.lat, lon: cam.lon, name: cam.commonName });
             camsLoaded++;
           }
         });
@@ -365,16 +449,137 @@
       forecastEl.style.color = state.color;
     }
 
-    function drawSelectedRoute(index) {
-      if (!globalRoutes[index]) return;
-      if (currentRouteLine) map.removeLayer(currentRouteLine);
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
 
-      // Reset styles
+    function getKeyCamerasForRoute(geoJsonGeometry, count = 5) {
+      if (!geoJsonGeometry || !geoJsonGeometry.coordinates || geoJsonGeometry.coordinates.length === 0) return [];
+      const coords = geoJsonGeometry.coordinates;
+      const selected = [];
+      const selectedCamNames = new Set();
+
+      const fractions = [];
+      for (let i = 0; i < count; i++) {
+        fractions.push((i + 0.5) / count);
+      }
+
+      fractions.forEach(frac => {
+        const idx = Math.min(coords.length - 1, Math.floor(frac * coords.length));
+        const pt = coords[idx];
+        const targetLat = pt[1];
+        const targetLon = pt[0];
+
+        let bestCam = null;
+        let bestDist = 9999;
+
+        allCamMarkers.forEach(item => {
+          if (selectedCamNames.has(item.name)) return;
+
+          const d = haversineKm(item.lat, item.lon, targetLat, targetLon);
+          if (d < bestDist) {
+            bestDist = d;
+            bestCam = item;
+          }
+        });
+
+        if (bestCam && bestDist < 1.5) {
+          const tooClose = selected.some(s => haversineKm(s.lat, s.lon, bestCam.lat, bestCam.lon) < 0.6);
+          if (!tooClose) {
+            selected.push(bestCam);
+            selectedCamNames.add(bestCam.name);
+          }
+        }
+      });
+
+      return selected;
+    }
+
+    function updateRouteCameraVisibility(selectedIndex) {
+      if (!globalRoutes || globalRoutes.length === 0 || allCamMarkers.length === 0) return;
+
+      const mainRouteGeo = globalRoutes[selectedIndex];
+      const altRouteGeos = globalRoutes.filter((_, idx) => idx !== selectedIndex);
+
+      const mainCams = getKeyCamerasForRoute(mainRouteGeo, 5);
+      const mainCamSet = new Set(mainCams.map(c => c.name));
+
+      const altCamSet = new Set();
+      altRouteGeos.forEach(geo => {
+        const altCams = getKeyCamerasForRoute(geo, 3);
+        altCams.forEach(c => {
+          if (!mainCamSet.has(c.name)) {
+            altCamSet.add(c.name);
+          }
+        });
+      });
+
+      allCamMarkers.forEach(item => {
+        const markerEl = item.marker.getElement();
+        if (!markerEl) return;
+
+        const innerEl = markerEl.querySelector('.custom-marker');
+        if (!innerEl) return;
+
+        innerEl.classList.remove('cam-main-route', 'cam-alt-route', 'cam-off-route');
+
+        if (mainCamSet.has(item.name)) {
+          innerEl.classList.add('cam-main-route');
+          markerEl.style.zIndex = "2500";
+          markerEl.style.display = "block";
+        } else if (altCamSet.has(item.name)) {
+          innerEl.classList.add('cam-alt-route');
+          markerEl.style.zIndex = "2000";
+          markerEl.style.display = "block";
+        } else {
+          innerEl.classList.add('cam-off-route');
+          markerEl.style.zIndex = "100";
+          markerEl.style.display = "none";
+        }
+      });
+    }
+
+    function drawSelectedRoute(index) {
+      if (!globalRoutes || globalRoutes.length === 0) return;
+
+      routeLayers.forEach(l => map.removeLayer(l));
+      routeLayers = [];
+
+      const colors = ['#37C871', '#FF5C5C', '#F2A93B'];
+
+      // Draw background alternative routes
+      [0, 1, 2].forEach(i => {
+        if (i !== index && globalRoutes[i]) {
+          const altLayer = L.geoJSON(globalRoutes[i], {
+            style: { color: colors[i], weight: 4, opacity: 0.45, dashArray: '8, 8' }
+          }).addTo(map);
+          routeLayers.push(altLayer);
+        }
+      });
+
+      // Draw selected main route on top
+      if (globalRoutes[index]) {
+        const mainLayer = L.geoJSON(globalRoutes[index], {
+          style: { color: colors[index], weight: 7, opacity: 0.95 }
+        }).addTo(map);
+        routeLayers.push(mainLayer);
+
+        map.fitBounds(mainLayer.getBounds(), { padding: [60, 60] });
+      }
+
+      // Reset sidebar card styles
       [0, 1, 2].forEach(i => {
         const card = document.getElementById(`card-${i}`);
-        if(card) {
-          card.style.opacity = (i === index) ? '1' : '0.5';
-          if(i === index) {
+        if (card) {
+          card.style.opacity = (i === index) ? '1' : '0.6';
+          if (i === index) {
             card.style.borderColor = i === 0 ? 'var(--green)' : (i === 1 ? 'var(--red)' : 'var(--amber)');
           } else {
             card.style.borderColor = 'var(--line)';
@@ -382,14 +587,8 @@
         }
       });
 
-      const colors = ['#37C871', '#FF5C5C', '#F2A93B'];
-      const dash = index === 0 ? 'none' : '10, 10';
-      
-      currentRouteLine = L.geoJSON(globalRoutes[index], {
-        style: { color: colors[index], weight: 6, opacity: 0.9, dashArray: dash }
-      }).addTo(map);
-
-      map.fitBounds(currentRouteLine.getBounds(), { padding: [50, 50] });
+      // Filter and highlight route cameras vs transparent off-route cameras
+      updateRouteCameraVisibility(index);
     }
 
     function getFutureTimeStr(minutesToAdd) {
@@ -494,6 +693,185 @@
         console.log("Routing error", e);
       }
       btn.innerHTML = origText;
+    }
+
+    // Curated London Locations for Instant Suggestion
+    const popularLondonPlaces = [
+      "Piccadilly Circus, London",
+      "Heathrow Airport, London",
+      "Gatwick Airport, London",
+      "London City Airport, London",
+      "King's Cross Station, London",
+      "St Pancras International, London",
+      "Paddington Station, London",
+      "Waterloo Station, London",
+      "Victoria Station, London",
+      "London Bridge Station, London",
+      "Liverpool Street Station, London",
+      "Euston Station, London",
+      "Big Ben, Westminster, London",
+      "London Eye, South Bank, London",
+      "Tower Bridge, London",
+      "Tower of London, London",
+      "Buckingham Palace, London",
+      "Trafalgar Square, London",
+      "Oxford Street, London",
+      "Regent Street, London",
+      "Covent Garden, London",
+      "Soho, London",
+      "Camden Market, London",
+      "Canary Wharf, London",
+      "Hyde Park, London",
+      "Regent's Park, London",
+      "Greenwich Observatory, London",
+      "Westminster Abbey, London",
+      "St Paul's Cathedral, London",
+      "British Museum, London",
+      "Natural History Museum, London",
+      "Wembley Stadium, London",
+      "O2 Arena, Greenwich, London",
+      "Stratford Westfield, London",
+      "Knightsbridge, London",
+      "Harrods, Knightsbridge, London"
+    ];
+
+    function escapeQuotes(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    }
+
+    function setupAutocomplete(inputId, resultsId) {
+      const inputEl = document.getElementById(inputId);
+      const resultsEl = document.getElementById(resultsId);
+      let debounceTimer = null;
+
+      inputEl.addEventListener('input', function() {
+        const query = this.value.trim();
+        clearTimeout(debounceTimer);
+
+        if (query.length < 1) {
+          resultsEl.style.display = 'none';
+          resultsEl.innerHTML = '';
+          return;
+        }
+
+        // 1. Instant local match from preloaded popular places
+        const localMatches = popularLondonPlaces.filter(p => 
+          p.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 5);
+
+        renderAutocompleteResults(localMatches, resultsEl, inputEl);
+
+        // 2. Live API search with Photon / Nominatim for full London street & place coverage
+        debounceTimer = setTimeout(async () => {
+          try {
+            const apiRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + ' London')}&lat=51.5074&lon=-0.1278&limit=6`);
+            if (apiRes.ok) {
+              const data = await apiRes.json();
+              if (data.features && data.features.length > 0) {
+                const apiPlaces = data.features.map(f => {
+                  const props = f.properties;
+                  const name = props.name || props.street || '';
+                  const city = props.city || props.district || 'London';
+                  if (!name) return null;
+                  return `${name}, ${city}`;
+                }).filter(Boolean);
+
+                const combined = Array.from(new Set([...localMatches, ...apiPlaces])).slice(0, 6);
+                renderAutocompleteResults(combined, resultsEl, inputEl);
+              }
+            }
+          } catch(e) {
+            console.log("Autocomplete API error:", e);
+          }
+        }, 150);
+      });
+
+      inputEl.addEventListener('focus', function() {
+        if (this.value.trim().length >= 1) {
+          this.dispatchEvent(new Event('input'));
+        }
+      });
+    }
+
+    function renderAutocompleteResults(items, resultsEl, inputEl) {
+      if (!items || items.length === 0) {
+        resultsEl.style.display = 'none';
+        resultsEl.innerHTML = '';
+        return;
+      }
+
+      resultsEl.innerHTML = items.map(item => `
+        <div class="autocomplete-item" onclick="selectAutocomplete('${escapeQuotes(item)}', '${inputEl.id}', '${resultsEl.id}')">
+          <div class="autocomplete-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          </div>
+          <div class="autocomplete-text-container">
+            <div class="autocomplete-title">${item}</div>
+            <div class="autocomplete-sub">London, UK</div>
+          </div>
+        </div>
+      `).join('');
+      resultsEl.style.display = 'block';
+    }
+
+    function selectAutocomplete(val, inputId, resultsId) {
+      document.getElementById(inputId).value = val;
+      const resultsEl = document.getElementById(resultsId);
+      resultsEl.style.display = 'none';
+      resultsEl.innerHTML = '';
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.search-field-wrapper')) {
+        document.querySelectorAll('.autocomplete-results').forEach(el => {
+          el.style.display = 'none';
+        });
+      }
+    });
+
+    setupAutocomplete('originInput', 'originResults');
+    setupAutocomplete('destInput', 'destResults');
+
+    function clearInput(inputId, resultsId) {
+      const inputEl = document.getElementById(inputId);
+      if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+      }
+      const resultsEl = document.getElementById(resultsId);
+      if (resultsEl) {
+        resultsEl.style.display = 'none';
+        resultsEl.innerHTML = '';
+      }
+    }
+
+    function resetRouteAndCameras() {
+      document.getElementById('originInput').value = '';
+      document.getElementById('destInput').value = '';
+
+      if (routeLayers && routeLayers.length > 0) {
+        routeLayers.forEach(l => map.removeLayer(l));
+        routeLayers = [];
+      }
+      globalRoutes = [];
+
+      const resultsPanel = document.getElementById('routeResults');
+      if (resultsPanel) resultsPanel.style.display = 'none';
+
+      allCamMarkers.forEach(item => {
+        const markerEl = item.marker.getElement();
+        if (markerEl) {
+          markerEl.style.display = "block";
+          markerEl.style.zIndex = "1000";
+          const innerEl = markerEl.querySelector('.custom-marker');
+          if (innerEl) {
+            innerEl.classList.remove('cam-main-route', 'cam-alt-route', 'cam-off-route');
+            innerEl.style.opacity = "1";
+          }
+        }
+      });
+
+      map.setView([51.5074, -0.1278], 11);
     }
 
     // Initialize Map and load full global state/city dataset

@@ -9,41 +9,41 @@
     "van"
   ],
   "metrics": {
-    "overall_precision": 0.9326,
-    "overall_recall": 0.9205,
-    "f1_score": 0.9265,
-    "map_50": 0.9321,
-    "count_accuracy_pct": 90.58946380416968,
-    "count_mae": 1.08,
-    "latency_ms": 1748.0210638046265,
-    "fps": 0.5720754862206674
+    "overall_precision": 0.9285,
+    "overall_recall": 0.9194,
+    "f1_score": 0.9239,
+    "map_50": 0.9281,
+    "count_accuracy_pct": 90.75321377968437,
+    "count_mae": 1.06,
+    "latency_ms": 3.068394660949707,
+    "fps": 325.90331769463035
   },
   "class_metrics": {
     "car": {
-      "precision": 0.9627,
-      "recall": 0.97,
-      "f1": 0.9663
+      "precision": 0.9679,
+      "recall": 0.9721,
+      "f1": 0.97
     },
     "bus": {
-      "precision": 0.8793,
-      "recall": 0.8361,
-      "f1": 0.8571
+      "precision": 0.8952,
+      "recall": 0.8538,
+      "f1": 0.874
     },
     "truck": {
-      "precision": 0.8846,
-      "recall": 0.7419,
-      "f1": 0.807
+      "precision": 0.8246,
+      "recall": 0.7121,
+      "f1": 0.7642
     },
     "bike": {
-      "precision": 0.9228,
-      "recall": 0.9153,
-      "f1": 0.919
+      "precision": 0.9034,
+      "recall": 0.9188,
+      "f1": 0.911
     },
     "van": {
-      "precision": 0.8626,
-      "recall": 0.8433,
-      "f1": 0.8528
+      "precision": 0.8304,
+      "recall": 0.8017,
+      "f1": 0.8158
     }
   },
-  "evaluated_at": "2026-08-20 15:15:19"
+  "evaluated_at": "2026-08-20 17:59:14"
 }

@@ -28,12 +28,13 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-sys.path.append(r"d:\Innohack\innohack\backend")
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.append(str(BASE_DIR / "innohack" / "backend"))
 from model2_cv_engine import VideoTrafficCVEngine, VEHICLE_CONFIG
 
-MODELS_DIR = Path(r"d:\Innohack\models")
+MODELS_DIR = BASE_DIR / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
-CHARTS_DIR = Path(r"d:\Innohack\traffic_analysis_charts")
+CHARTS_DIR = BASE_DIR / "traffic_analysis_charts"
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 print("=" * 80)
@@ -154,7 +155,7 @@ metadata_m2 = {
 with open(MODELS_DIR / "model2_metrics.json", "w") as f:
     json.dump(metadata_m2, f, indent=2)
 
-print("\n[3/4] 💾 Saved Model 2 Metrics: d:\\Innohack\\models\\model2_metrics.json")
+print(f"\n[3/4] 💾 Saved Model 2 Metrics: {MODELS_DIR / 'model2_metrics.json'}")
 
 # [4/4] Generate Visual Verification Chart
 print("\n[4/4] 📈 Generating Computer Vision Evaluation Charts...")

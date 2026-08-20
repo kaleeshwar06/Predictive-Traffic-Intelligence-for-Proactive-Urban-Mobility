@@ -18,7 +18,8 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-METRICS_FILE = Path(r"d:\Innohack\models\model1_metrics.json")
+BASE_DIR = Path(__file__).resolve().parent
+METRICS_FILE = BASE_DIR / "models" / "model1_metrics.json"
 
 def print_evaluation_report():
     if not METRICS_FILE.exists():

@@ -18,10 +18,11 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-sys.path.append(r"d:\Innohack\innohack\backend")
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.append(str(BASE_DIR / "innohack" / "backend"))
 from model2_cv_engine import VideoTrafficCVEngine
 
-CHARTS_DIR = Path(r"d:\Innohack\traffic_analysis_charts")
+CHARTS_DIR = BASE_DIR / "traffic_analysis_charts"
 CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
 print("=====================================================================")

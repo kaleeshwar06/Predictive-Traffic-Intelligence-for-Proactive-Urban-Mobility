@@ -25,7 +25,12 @@ DETRAC_COLORS = {
     "others": (245, 158, 11)    # Amber
 }
 
-def visualize_frame(sequence="MVI_20011", frame_num=1, base_dir="d:/Innohack/detrac_sample_data", out_dir="d:/Innohack/detrac_preview", auto_open=True):
+BASE_DIR = Path(__file__).resolve().parent
+def visualize_frame(sequence="MVI_20011", frame_num=1, base_dir=None, out_dir=None, auto_open=True):
+    if base_dir is None:
+        base_dir = str(BASE_DIR / "detrac_sample_data")
+    if out_dir is None:
+        out_dir = str(BASE_DIR / "detrac_preview")
     """Loads an image frame and overlays bounding boxes from DETRAC XML annotations."""
     base = Path(base_dir)
     img_path = base / "DETRAC-train-data" / sequence / f"img{frame_num:05d}.jpg"
