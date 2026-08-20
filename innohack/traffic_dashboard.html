@@ -1,17 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RoutePulse — Global Traffic Dashboard</title>
+<title>Fleet Control & RoutePulse — Enterprise Traffic Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <!-- Leaflet CSS for OSM Map -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
-  :root{
+  :root[data-theme="light"] {
+    --bg: #F4F6FA;
+    --bg-sidebar: #FFFFFF;
+    --bg-header: #FFFFFF;
+    --panel: #FFFFFF;
+    --panel-alt: #F8FAFC;
+    --line: #E2E8F0;
+    --line-soft: #EDF2F7;
+    --text: #0F172A;
+    --text-dim: #64748B;
+    --text-faint: #94A3B8;
+    --active-pill-bg: #D9E6FF;
+    --active-pill-text: #1E40AF;
+    --btn-primary-bg: #0F172A;
+    --btn-primary-text: #FFFFFF;
+    --btn-primary-hover: #1E293B;
+    --input-bg: #FFFFFF;
+    --input-border: #E2E8F0;
+    --amber: #D97706;
+    --amber-dim: #FEF3C7;
+    --green: #16A34A;
+    --green-dim: #DCFCE7;
+    --red: #DC2626;
+    --red-dim: #FEE2E2;
+    --blue: #2563EB;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --map-filter: none;
+  }
+
+  :root[data-theme="dark"] {
     --bg: #0A0E17;
-    --bg-grid: #0D1220;
+    --bg-sidebar: #0F172A;
+    --bg-header: #121826;
     --panel: #121826;
     --panel-alt: #1A2233;
     --line: #263047;
@@ -19,6 +49,13 @@
     --text: #E8ECF4;
     --text-dim: #8B95AB;
     --text-faint: #576079;
+    --active-pill-bg: #1E293B;
+    --active-pill-text: #60A5FA;
+    --btn-primary-bg: #1E293B;
+    --btn-primary-text: #FFFFFF;
+    --btn-primary-hover: #334155;
+    --input-bg: #1A2233;
+    --input-border: #334155;
     --amber: #F2A93B;
     --amber-dim: #6b5324;
     --green: #37C871;
@@ -26,108 +63,170 @@
     --red: #FF5C5C;
     --red-dim: #4a2020;
     --blue: #4C8DFF;
-    --font-display: 'Chakra Petch', sans-serif;
-    --font-body: 'Inter', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    --map-filter: brightness(0.9) contrast(1.1);
   }
 
-  *{ margin:0; padding:0; box-sizing:border-box; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  body{
+  body {
     background: var(--bg);
     color: var(--text);
-    font-family: var(--font-body);
-    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
-  /* ===== Header ===== */
-  header{
-    display:flex; align-items:center; justify-content:space-between;
-    padding: 14px 20px;
-    background: var(--panel);
+  /* ===== Top Navigation Header ===== */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px;
+    background: var(--bg-header);
     border-bottom: 1px solid var(--line);
-    z-index: 20;
-  }
-  .brand{ display:flex; align-items:center; gap:12px; }
-  .brand-mark{
-    width:34px; height:34px; border-radius:8px;
-    background: linear-gradient(135deg, var(--amber), #c97f1c);
-    display:flex; align-items:center; justify-content:center;
-    font-family: var(--font-display); font-weight:700; color:#0A0E17; font-size:16px;
-  }
-  .brand-name{ font-family: var(--font-display); font-weight:700; font-size:19px; letter-spacing:0.5px; }
-  .brand-sub{ font-size:11px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:1px; }
-
-  .header-right{ display:flex; align-items:center; gap:22px; }
-  .status-pill{
-    display:flex; align-items:center; gap:7px;
-    font-family: var(--font-mono); font-size:12px; color: var(--green);
-    padding:6px 12px; background: var(--green-dim); border-radius:20px; border:1px solid rgba(55,200,113,0.3);
-  }
-  .status-dot{ width:7px; height:7px; border-radius:50%; background: var(--green); box-shadow:0 0 8px var(--green); animation: blink 2s infinite; }
-  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
-
-  /* ===== Main Layout ===== */
-  .main-container { display: flex; flex: 1; overflow: hidden; }
-
-  /* Map Area */
-  #map { flex: 1; height: 100%; background: #0A0E17; z-index: 1; }
-
-  /* Sidebar */
-  .sidebar {
-    width: 420px; background: var(--bg); border-left: 1px solid var(--line);
-    display: flex; flex-direction: column; z-index: 10; box-shadow: -4px 0 15px rgba(0,0,0,0.5);
+    height: 64px;
+    z-index: 30;
+    transition: background 0.3s ease, border-color 0.3s ease;
   }
 
-  /* Tab Buttons */
-  .tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--panel); }
-  .tab-btn {
-    flex: 1; padding: 16px 0; background: transparent; border: none;
-    color: var(--text-dim); font-family: var(--font-display); font-weight: 600; font-size: 14px; letter-spacing: 0.5px;
-    cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+  .header-left { display: flex; align-items: center; gap: 16px; width: 230px; }
+  .brand-logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--btn-primary-bg); color: var(--btn-primary-text);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
-  .tab-btn:hover { color: var(--text); background: var(--panel-alt); }
-  .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); background: var(--panel-alt); }
+  .brand-title { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 16px; color: var(--text); }
+  .brand-subtitle { font-size: 11px; color: var(--text-dim); }
 
-  /* Tab Content Area */
-  .tab-content { padding: 16px; flex: 1; overflow-y: auto; display: none; }
-  .tab-content.active { display: block; }
+  .header-center { flex: 1; display: flex; justify-content: center; max-width: 540px; margin: 0 auto; }
+  .search-global {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel-alt); border: 1px solid var(--input-border);
+    border-radius: 24px; padding: 8px 18px; width: 100%;
+    transition: all 0.2s ease;
+  }
+  .search-global:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .search-global input {
+    border: none; background: transparent; outline: none;
+    color: var(--text); font-size: 13.5px; width: 100%;
+  }
 
-  /* Shared Panel Styles (from original UI) */
-  .panel{ background: var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom: 16px; }
-  .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-  .panel-title{ font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text); display:flex; align-items:center; gap:8px;}
-  .panel-title .eyebrow{ width:3px; height:14px; background:var(--amber); border-radius:2px; display:inline-block; }
-  .panel-meta{ font-family: var(--font-mono); font-size:11px; color:var(--text-faint); }
+  .header-right { display: flex; align-items: center; gap: 14px; }
 
-  /* Video Monitor Frame */
-  .video-container { width: 100%; height: 220px; background: #000; border-radius: 10px; overflow: hidden; position: relative; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
-  .video-container video, .video-container img { width: 100%; height: 100%; object-fit: cover; }
-  .video-hud { position: absolute; top: 12px; left: 14px; background: rgba(10, 14, 23, 0.85); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; color: var(--green); }
+  .theme-toggle-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-alt); border: 1px solid var(--line);
+    color: var(--text); padding: 8px 14px; border-radius: 20px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .theme-toggle-btn:hover { background: var(--line); }
 
-  /* Density Rows */
-  .density-row{ display:flex; align-items:center; gap:12px; margin-bottom:13px; }
-  .density-row:last-child{ margin-bottom:0; }
-  .density-icon{ width:30px; height:30px; border-radius:8px; background:var(--panel-alt); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .density-info{ flex:1; }
-  .density-top{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; }
-  .density-label{ color:var(--text); font-weight:500; }
-  .density-count{ font-family:var(--font-mono); color:var(--text-dim); font-size:11px; }
-  .density-bar-track{ height:6px; background:var(--panel-alt); border-radius:4px; overflow:hidden; }
-  .density-bar-fill{ height:100%; border-radius:4px; transition: width 0.3s ease; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--panel-alt); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s; position: relative;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--line); }
+  .icon-badge {
+    position: absolute; top: 6px; right: 6px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--red);
+  }
 
-  /* Route Planner Tab Inputs & Autocomplete */
-  .search-field-wrapper { position: relative; margin-bottom: 12px; }
-  .search-field { display:flex; align-items:center; gap:10px; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding: 13px 16px; margin-bottom: 0; }
-  .search-field:focus-within { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
-  .search-field svg { flex-shrink:0; opacity:0.55; }
-  .search-field input { background:none; border:none; outline:none; color:var(--text); font-family: var(--font-body); font-size:14px; width:100%; }
+  .user-profile {
+    display: flex; align-items: center; gap: 10px;
+    padding: 3px; border-radius: 24px; cursor: pointer;
+  }
+  .user-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366F1, #3B82F6);
+    display: flex; align-items: center; justify-content: center;
+    color: #FFF; font-weight: 700; font-size: 13px;
+  }
 
+  /* ===== Main 3-Column Workspace ===== */
+  .app-container { display: flex; flex: 1; overflow: hidden; }
+
+  /* 1. Left Nav Sidebar */
+  .left-nav {
+    width: 230px; background: var(--bg-sidebar); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 20px 14px; z-index: 20; transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .nav-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-radius: 12px;
+    color: var(--text-dim); font-size: 13.5px; font-weight: 600;
+    text-decoration: none; cursor: pointer; transition: all 0.2s ease;
+    border: none; background: transparent; width: 100%; text-align: left;
+  }
+  .nav-item:hover { color: var(--text); background: var(--panel-alt); }
+  .nav-item.active {
+    background: var(--active-pill-bg); color: var(--active-pill-text);
+    font-weight: 700;
+  }
+  .nav-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+
+  .btn-sidebar-action {
+    background: var(--btn-primary-bg); color: var(--btn-primary-text);
+    border: none; border-radius: 10px; padding: 12px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    cursor: pointer; transition: all 0.2s ease; margin-top: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; box-shadow: var(--shadow);
+  }
+  .btn-sidebar-action:hover { background: var(--btn-primary-hover); transform: translateY(-1px); }
+
+  .nav-footer { display: flex; flex-direction: column; gap: 4px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+  /* 2. Middle Control Panel */
+  .middle-panel {
+    width: 380px; background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; z-index: 10;
+    overflow-y: auto; transition: background 0.3s ease, border-color 0.3s ease;
+    box-shadow: var(--shadow);
+  }
+
+  .panel-header { padding: 20px 22px 14px 22px; border-bottom: 1px solid var(--line-soft); }
+  .panel-title-text { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+
+  .panel-body { padding: 20px 22px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Timeline Connector for Origin/Destination */
+  .route-timeline-container { position: relative; display: flex; flex-direction: column; gap: 14px; }
+  .timeline-line {
+    position: absolute; left: 15px; top: 32px; bottom: 32px; width: 2px;
+    background: var(--line); z-index: 1; border-left: 2px dashed var(--text-faint);
+  }
+
+  .search-field-wrapper { position: relative; z-index: 2; }
+  .search-field {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--input-bg); border: 1.5px solid var(--input-border);
+    border-radius: 12px; padding: 12px 14px; transition: all 0.2s ease;
+  }
+  .search-field:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+  .pin-icon { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .pin-icon.origin-pin { border: 3px solid var(--blue); background: transparent; }
+  .pin-icon.dest-pin { background: var(--blue); border: 3px solid var(--blue); }
+
+  .search-field input {
+    border: none; background: transparent; outline: none;
+    color: var(--text); font-size: 13.5px; font-weight: 500; width: 100%;
+  }
+
+  /* Autocomplete Dropdown */
   .autocomplete-results {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-    max-height: 240px; overflow-y: auto; z-index: 1000;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8); display: none;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); z-index: 100; display: none; overflow: hidden;
   }
   .autocomplete-item {
     padding: 10px 14px; font-size: 13px; color: var(--text);
@@ -135,252 +234,430 @@
     display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;
   }
   .autocomplete-item:last-child { border-bottom: none; }
-  .autocomplete-item:hover { background: var(--panel-alt); color: var(--amber); }
-  .autocomplete-icon {
-    width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; color: var(--amber);
-  }
-  .autocomplete-text-container { flex: 1; overflow: hidden; }
-  .autocomplete-title { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .autocomplete-item:hover .autocomplete-title { color: var(--amber); }
-  .autocomplete-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  
-  .find-btn { font-family: var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; background: linear-gradient(135deg, var(--amber), #d18f28); color:#0A0E17; border:none; border-radius:10px; padding: 14px; width: 100%; cursor:pointer; display:flex; align-items:center; justify-content: center; gap:8px; margin-bottom: 16px; margin-top: 6px; }
-  .find-btn:hover { filter:brightness(1.08); transform: translateY(-1px); }
+  .autocomplete-item:hover { background: var(--panel-alt); color: var(--blue); }
 
-  /* Route Cards */
-  .route-card{ border:1px solid var(--line); border-radius:10px; padding:14px 15px; margin-bottom:10px; background: var(--panel-alt); cursor: pointer; transition: all 0.2s; }
-  .route-card.best{ border-color: var(--green); box-shadow: 0 0 0 1px rgba(55,200,113,0.15); }
-  .route-card-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-  .route-name{ font-family:var(--font-display); font-weight:600; font-size:13.5px; display:flex; align-items:center; gap:8px; }
-  .best-tag{ font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; background: var(--green-dim); color:var(--green); padding:2px 8px; border-radius:12px; border:1px solid rgba(55,200,113,0.3); }
-  .route-stats{ display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); }
-  .route-congestion-bar{ height:5px; border-radius:3px; background:var(--panel); margin-top:10px; overflow:hidden; }
+  /* Optimization Constraints Cards */
+  .section-label { font-size: 11px; font-weight: 700; color: var(--text-faint); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .constraint-cards { display: flex; flex-direction: column; gap: 10px; }
+  .constraint-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--input-bg); border: 1.5px solid var(--input-border);
+    border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all 0.2s ease;
+  }
+  .constraint-card.active { border-color: var(--blue); background: var(--panel-alt); }
+  .constraint-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text-dim); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .constraint-card.active .constraint-radio { border-color: var(--blue); background: var(--blue); }
+  .constraint-card.active .constraint-radio::after { content:''; width:6px; height:6px; background:#FFF; border-radius:50%; }
+  .constraint-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .constraint-desc { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; }
+
+  /* Action Buttons */
+  .btn-calculate {
+    background: var(--btn-primary-bg); color: var(--btn-primary-text);
+    border: none; border-radius: 12px; padding: 14px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.3px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.2s ease; width: 100%; box-shadow: var(--shadow);
+  }
+  .btn-calculate:hover { background: var(--btn-primary-hover); transform: translateY(-1px); }
+
+  .btn-reset {
+    background: transparent; color: var(--red); border: 1.5px solid var(--line);
+    border-radius: 12px; padding: 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.2s ease; width: 100%;
+  }
+  .btn-reset:hover { background: var(--red-dim); border-color: var(--red); }
+
+  /* Route Cards Result */
+  .route-card {
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 14px;
+    background: var(--input-bg); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px;
+  }
+  .route-card.best { border-color: var(--green); background: var(--panel-alt); }
+  .route-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .route-name { font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .best-tag { font-size: 10px; text-transform: uppercase; background: var(--green-dim); color: var(--green); padding: 2px 8px; border-radius: 12px; font-weight: 700; }
+  .route-congestion-bar { height: 5px; border-radius: 3px; background: var(--line-soft); margin-top: 10px; overflow: hidden; }
+
+  /* 3. Right Map Area */
+  .map-area { flex: 1; height: 100%; position: relative; z-index: 1; }
+  #map { width: 100%; height: 100%; background: var(--bg); }
+
+  /* Video & Live predictions panel */
+  .video-container {
+    position: relative; width: 100%; height: 180px; background: #000;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 14px;
+  }
+  .video-container video, .video-container img { width: 100%; height: 100%; object-fit: cover; }
+  .video-hud {
+    position: absolute; bottom: 8px; left: 8px; right: 8px;
+    background: rgba(0,0,0,0.75); color: #FFF; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; padding: 4px 8px; border-radius: 6px; backdrop-filter: blur(4px);
+  }
 
   /* Custom Leaflet Markers */
-  .custom-marker { background: #0A0E17; border: 1px solid #4C8DFF; border-radius: 16px; padding: 3px 8px; color: #4C8DFF; font-family: var(--font-mono); font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); white-space: nowrap; cursor: pointer; transition: all 0.3s ease; }
-  .custom-marker:hover { background: #121826; border-color: #F2A93B; color: #F2A93B; opacity: 1 !important; z-index: 9999 !important; }
+  .custom-marker {
+    background: var(--bg-sidebar); border: 1.5px solid var(--blue); border-radius: 16px;
+    padding: 3px 8px; color: var(--blue); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 5px;
+    box-shadow: var(--shadow); white-space: nowrap; cursor: pointer; transition: all 0.3s ease;
+  }
+  .custom-marker:hover { border-color: var(--amber); color: var(--amber); opacity: 1 !important; z-index: 9999 !important; }
   .custom-marker svg { width: 12px; height: 12px; }
 
-  /* Highlighted key cameras on main selected route */
   .custom-marker.cam-main-route {
-    background: #102418 !important;
-    border: 2px solid #37C871 !important;
-    color: #37C871 !important;
-    box-shadow: 0 0 14px rgba(55, 200, 113, 0.75) !important;
-    opacity: 1 !important;
-    transform: scale(1.05);
+    background: var(--green-dim) !important; border: 2px solid var(--green) !important;
+    color: var(--green) !important; box-shadow: 0 0 14px rgba(22, 163, 74, 0.5) !important;
+    opacity: 1 !important; transform: scale(1.05);
   }
 
-  /* Key cameras along alternative routes */
   .custom-marker.cam-alt-route {
-    background: #241D12 !important;
-    border: 1.5px solid #F2A93B !important;
-    color: #F2A93B !important;
-    box-shadow: 0 0 10px rgba(242, 169, 59, 0.4) !important;
-    opacity: 0.85 !important;
+    background: var(--amber-dim) !important; border: 1.5px solid var(--amber) !important;
+    color: var(--amber) !important; opacity: 0.85 !important;
   }
 
-  /* Clear & Reset Buttons */
+  .custom-marker.cam-off-route { display: none !important; opacity: 0 !important; }
+
   .clear-input-btn {
     background: none; border: none; color: var(--text-dim); font-size: 16px; line-height: 1;
     cursor: pointer; padding: 2px 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     transition: all 0.2s; opacity: 0.6; flex-shrink: 0;
   }
-  .clear-input-btn:hover { color: var(--red); opacity: 1; background: rgba(255, 92, 92, 0.15); }
-
-  .clear-route-btn {
-    font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.5px;
-    background: var(--panel-alt); color: var(--red); border: 1px solid var(--line);
-    border-radius: 10px; padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 6px;
-    transition: all 0.2s; white-space: nowrap;
-  }
-  .clear-route-btn:hover { background: var(--red-dim); border-color: var(--red); color: #FFF; transform: translateY(-1px); }
-
-  /* Off-route cameras (completely hidden) */
-  .custom-marker.cam-off-route {
-    display: none !important;
-    opacity: 0 !important;
-  }
-
+  .clear-input-btn:hover { color: var(--red); opacity: 1; background: rgba(220, 38, 38, 0.15); }
 </style>
 </head>
 <body>
 
-  <!-- Header (Restored Original Style) -->
+  <!-- Top Navigation Header -->
   <header>
-    <div class="brand">
-      <div class="brand-mark">RP</div>
+    <div class="header-left">
+      <div class="brand-logo">RP</div>
       <div>
-        <div class="brand-name">ROUTEPULSE GLOBAL</div>
-        <div class="brand-sub">TfL JamCams & OpenStreetMap Integrated Engine</div>
+        <div class="brand-title">Fleet Control</div>
+        <div class="brand-subtitle">Main Terminal & Traffic Hub</div>
       </div>
     </div>
+
+    <div class="header-center">
+      <div class="search-global">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" placeholder="Search shipments, vehicles, cameras, or locations...">
+      </div>
+    </div>
+
     <div class="header-right">
-      <div class="status-pill"><span class="status-dot"></span><span id="backendStatusText">GLOBAL API LINK ACTIVE</span></div>
+      <button class="theme-toggle-btn" onclick="toggleTheme()" id="themeToggleBtn">
+        <span id="themeToggleIcon">🌙</span>
+        <span id="themeToggleText">Dark Mode</span>
+      </button>
+
+      <div class="icon-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="icon-badge"></span>
+      </div>
+
+      <div class="icon-btn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+
+      <div class="user-profile">
+        <div class="user-avatar">AD</div>
+      </div>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <div class="main-container">
-    
-    <!-- Left: OSM Map -->
-    <div id="map"></div>
+  <!-- Main Workspace -->
+  <div class="app-container">
 
-    <!-- Right: Sidebar -->
-    <div class="sidebar">
+    <!-- 1. Left Nav Sidebar -->
+    <nav class="left-nav">
+      <div class="nav-group">
+        <button class="nav-item active" id="navBtn-planner" onclick="switchNavTab('planner')">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/></svg></span>
+          Route Planner
+        </button>
+
+        <button class="nav-item" id="navBtn-predictions" onclick="switchNavTab('predictions')">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 5 20 19 16 16 16 8"/></svg></span>
+          CCTV & Predictions
+        </button>
+
+        <button class="nav-item" onclick="switchNavTab('planner')">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8l4-3v14l-4-3"/></svg></span>
+          Fleet Status
+        </button>
+
+        <button class="nav-item" onclick="switchNavTab('predictions')">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+          Live Analytics
+        </button>
+
+        <button class="nav-item" onclick="alert('Archive reports loaded')">
+          <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+          Archive
+        </button>
+
+        <button class="btn-sidebar-action" onclick="calculateRoute()">
+          OPTIMIZE ROUTES
+        </button>
+      </div>
+
+      <div class="nav-footer">
+        <button class="nav-item">
+          <span class="nav-icon">❓</span> Support
+        </button>
+        <button class="nav-item">
+          <span class="nav-icon">🚪</span> Sign Out
+        </button>
+      </div>
+    </nav>
+
+    <!-- 2. Middle Control Panel -->
+    <main class="middle-panel">
       
-      <!-- Tabs -->
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('predictions')">LIVE PREDICTIONS</button>
-        <button class="tab-btn" onclick="switchTab('planner')">ROUTE PLANNER</button>
-      </div>
-
-      <!-- Predictions Content (Restored Original Panels) -->
-      <div id="tab-predictions" class="tab-content active">
-        
-        <div class="video-container">
-          <video id="liveVideo" autoplay loop muted playsinline style="display:none;"></video>
-          <img id="liveImg" src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80" alt="Camera Feed">
-          <div class="video-hud" id="videoHudText">● REC [SELECT A CAMERA ON MAP]</div>
+      <!-- Route Planner Content -->
+      <div id="content-planner" style="display: flex; flex-direction: column; flex: 1;">
+        <div class="panel-header">
+          <div class="panel-title-text">Plan Route</div>
         </div>
 
-        <!-- Vehicle density breakdown -->
-        <div class="panel">
-          <div class="panel-head">
-            <div class="panel-title"><span class="eyebrow"></span>CCTV VEHICLE BREAKDOWN</div>
-            <div class="panel-meta" id="camNameMeta">LONDON TFL</div>
-          </div>
-
-          <div class="density-row">
-            <div class="density-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-9h4l3 9M10 8h5"/></svg></div>
-            <div class="density-info">
-              <div class="density-top"><span class="density-label">Motorbikes & Autos</span><span class="density-count" id="countBikes">12 units</span></div>
-              <div class="density-bar-track"><div class="density-bar-fill" id="barBikes" style="width:65%; background:#4C8DFF;"></div></div>
-            </div>
-          </div>
-
-          <div class="density-row">
-            <div class="density-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><path d="M3 13l2-6h14l2 6M5 13h14v4H5z"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg></div>
-            <div class="density-info">
-              <div class="density-top"><span class="density-label">Cars</span><span class="density-count" id="countCars">45 units</span></div>
-              <div class="density-bar-track"><div class="density-bar-fill" id="barCars" style="width:85%; background:#F2A93B;"></div></div>
-            </div>
-          </div>
-
-          <div class="density-row">
-            <div class="density-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><rect x="3" y="6" width="18" height="11" rx="1"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/></svg></div>
-            <div class="density-info">
-              <div class="density-top"><span class="density-label">Buses / HGVs</span><span class="density-count" id="countBuses">8 units</span></div>
-              <div class="density-bar-track"><div class="density-bar-fill" id="barBuses" style="width:40%; background:#FF5C5C;"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Predicted Congestion -->
-        <div class="panel">
-          <div class="panel-head">
-            <div class="panel-title"><span class="eyebrow" style="background:#37C871"></span>MODEL 1 FORECAST (+15m)</div>
-          </div>
-          <div style="font-family:var(--font-mono); font-size:24px; font-weight:700; color:var(--amber);" id="forecastStatus">
-            MODERATE TRAFFIC
-          </div>
-          <div style="font-size:12px; color:var(--text-dim); margin-top:8px;">
-            Based on historical trends and live CV flow rate (Model 2).
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Route Planner Content (Restored Original Style) -->
-      <div id="tab-planner" class="tab-content">
-        <div class="search-field-wrapper">
-          <div class="search-field">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C8DFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-            <input type="text" id="originInput" value="Piccadilly Circus, London" placeholder="Type origin location..." autocomplete="off">
-            <button type="button" class="clear-input-btn" onclick="clearInput('originInput', 'originResults')" title="Clear origin">&times;</button>
-          </div>
-          <div class="autocomplete-results" id="originResults"></div>
-        </div>
-
-        <div class="search-field-wrapper">
-          <div class="search-field">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-            <input type="text" id="destInput" value="Heathrow Airport, London" placeholder="Type destination location..." autocomplete="off">
-            <button type="button" class="clear-input-btn" onclick="clearInput('destInput', 'destResults')" title="Clear destination">&times;</button>
-          </div>
-          <div class="autocomplete-results" id="destResults"></div>
-        </div>
-        
-        <div style="display:flex; gap:10px; margin-bottom: 16px; margin-top: 6px;">
-          <button class="find-btn" style="flex:1; margin:0;" onclick="calculateRoute()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A0E17" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            FIND OPTIMIZED ROUTE
-          </button>
-          <button class="clear-route-btn" onclick="resetRouteAndCameras()" title="Reset inputs and reveal all map cameras">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            RESET
-          </button>
-        </div>
-
-        <div id="routeResults" style="display:none;">
-          <div class="route-card best" id="card-0" onclick="drawSelectedRoute(0)">
-            <div class="route-card-top">
-              <div class="route-name">🛣️ AI Predictive Route <span class="best-tag">Optimal</span></div>
-            </div>
-            <div class="route-stats" id="stats-0"></div>
-            <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:30%; background:#37C871;"></div></div>
-          </div>
-
-          <div class="route-card" id="card-1" onclick="drawSelectedRoute(1)">
-            <div class="route-card-top">
-              <div class="route-name">🛣️ Standard Route (Congested)</div>
-            </div>
-            <div class="route-stats" id="stats-1"></div>
-            <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:85%; background:#FF5C5C;"></div></div>
-          </div>
+        <div class="panel-body">
           
-          <div class="route-card" id="card-2" onclick="drawSelectedRoute(2)">
-            <div class="route-card-top">
-              <div class="route-name">🛣️ Alternative Route 2</div>
+          <!-- Origin & Destination Inputs with Timeline -->
+          <div class="route-timeline-container">
+            <div class="timeline-line"></div>
+
+            <div>
+              <div class="section-label">Origin</div>
+              <div class="search-field-wrapper">
+                <div class="search-field">
+                  <div class="pin-icon origin-pin"></div>
+                  <input type="text" id="originInput" value="Piccadilly Circus, London" placeholder="Enter origin address..." autocomplete="off">
+                  <button type="button" class="clear-input-btn" onclick="clearInput('originInput', 'originResults')" title="Clear origin">&times;</button>
+                </div>
+                <div class="autocomplete-results" id="originResults"></div>
+              </div>
             </div>
-            <div class="route-stats" id="stats-2"></div>
-            <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:55%; background:#F2A93B;"></div></div>
+
+            <div>
+              <div class="section-label">Destination</div>
+              <div class="search-field-wrapper">
+                <div class="search-field">
+                  <div class="pin-icon dest-pin"></div>
+                  <input type="text" id="destInput" value="Heathrow Airport, London" placeholder="Enter destination address..." autocomplete="off">
+                  <button type="button" class="clear-input-btn" onclick="clearInput('destInput', 'destResults')" title="Clear destination">&times;</button>
+                </div>
+                <div class="autocomplete-results" id="destResults"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Optimization Constraints Section -->
+          <div>
+            <div class="section-label">Optimization Constraints</div>
+            <div class="constraint-cards">
+              <div class="constraint-card active" onclick="selectConstraint(this)">
+                <div class="constraint-radio"></div>
+                <div>
+                  <div class="constraint-title">Fastest Route</div>
+                  <div class="constraint-desc">Prioritize minimum transit time & AI speed</div>
+                </div>
+              </div>
+
+              <div class="constraint-card" onclick="selectConstraint(this)">
+                <div class="constraint-radio"></div>
+                <div>
+                  <div class="constraint-title">Fuel Efficient</div>
+                  <div class="constraint-desc">Eco-friendly path with minimal idling</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn-calculate" onclick="calculateRoute()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              Calculate Route
+            </button>
+            <button class="btn-reset" onclick="resetRouteAndCameras()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Reset Locations & Show All Cameras
+            </button>
+          </div>
+
+          <!-- Route Results -->
+          <div id="routeResults" style="display:none;">
+            <div class="section-label">Available Route Alternatives</div>
+
+            <div class="route-card best" id="card-0" onclick="drawSelectedRoute(0)">
+              <div class="route-card-top">
+                <div class="route-name">🛣️ AI Optimal Route <span class="best-tag">Recommended</span></div>
+              </div>
+              <div class="route-stats" id="stats-0"></div>
+              <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:25%; background:var(--green);"></div></div>
+            </div>
+
+            <div class="route-card" id="card-1" onclick="drawSelectedRoute(1)">
+              <div class="route-card-top">
+                <div class="route-name">🛣️ Standard Route</div>
+              </div>
+              <div class="route-stats" id="stats-1"></div>
+              <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:80%; background:var(--red);"></div></div>
+            </div>
+            
+            <div class="route-card" id="card-2" onclick="drawSelectedRoute(2)">
+              <div class="route-card-top">
+                <div class="route-name">🛣️ Alternative Corridor</div>
+              </div>
+              <div class="route-stats" id="stats-2"></div>
+              <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:50%; background:var(--amber);"></div></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- CCTV & Predictions Content -->
+      <div id="content-predictions" style="display: none; flex-direction: column; flex: 1;">
+        <div class="panel-header">
+          <div class="panel-title-text">Live CCTV Analytics</div>
+        </div>
+
+        <div class="panel-body">
+          <div class="video-container">
+            <video id="liveVideo" autoplay loop muted playsinline style="display:none;"></video>
+            <img id="liveImg" src="https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80" alt="Camera Feed">
+            <div class="video-hud" id="videoHudText">● REC [SELECT A CAMERA ON MAP]</div>
+          </div>
+
+          <!-- Vehicle Density Breakdown -->
+          <div style="background: var(--input-bg); border:1px solid var(--input-border); border-radius:12px; padding:16px;">
+            <div style="font-size:12px; font-weight:700; color:var(--text-dim); margin-bottom:12px;" id="camNameMeta">LONDON TFL CCTVS</div>
+            
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;">
+              <span>Motorbikes & Autos</span><span id="countBikes" style="font-weight:700;">12 units</span>
+            </div>
+            <div style="height:6px; background:var(--line-soft); border-radius:3px; margin-bottom:14px; overflow:hidden;">
+              <div id="barBikes" style="width:65%; height:100%; background:var(--blue);"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;">
+              <span>Passenger Cars</span><span id="countCars" style="font-weight:700;">45 units</span>
+            </div>
+            <div style="height:6px; background:var(--line-soft); border-radius:3px; margin-bottom:14px; overflow:hidden;">
+              <div id="barCars" style="width:85%; height:100%; background:var(--amber);"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px;">
+              <span>Buses & HGVs</span><span id="countBuses" style="font-weight:700;">8 units</span>
+            </div>
+            <div style="height:6px; background:var(--line-soft); border-radius:3px; overflow:hidden;">
+              <div id="barBuses" style="width:40%; height:100%; background:var(--red);"></div>
+            </div>
+          </div>
+
+          <!-- Model 1 Forecast -->
+          <div style="background: var(--input-bg); border:1px solid var(--input-border); border-radius:12px; padding:16px;">
+            <div class="section-label">MODEL 1 FORECAST (+15m)</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:22px; font-weight:700; color:var(--amber); margin-top:4px;" id="forecastStatus">
+              MODERATE TRAFFIC
+            </div>
+            <div style="font-size:12px; color:var(--text-dim); margin-top:6px;">
+              AI model spatial-temporal prediction from camera feed.
+            </div>
           </div>
         </div>
       </div>
 
+    </main>
+
+    <!-- 3. Right Leaflet Map -->
+    <div class="map-area">
+      <div id="map"></div>
     </div>
+
   </div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Tab Switching Logic
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      event.target.classList.add('active');
-      document.getElementById('tab-' + tabId).classList.add('active');
+    // Theme Switcher & Map Tile Logic
+    let map = null;
+    let lightTileLayer = null;
+    let darkTileLayer = null;
+    let currentTileLayer = null;
+
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([51.5074, -0.1278], 11);
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      lightTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM contributors &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+      });
+
+      darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OSM contributors &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+      });
+
+      const initialTheme = localStorage.getItem('theme') || 'light';
+      setTheme(initialTheme);
     }
 
-    // Initialize Leaflet Map
-    const map = L.map('map', { zoomControl: false }).setView([51.5074, -0.1278], 11);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OSM contributors &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(map);
+      const iconEl = document.getElementById('themeToggleIcon');
+      const textEl = document.getElementById('themeToggleText');
 
+      if (map) {
+        if (currentTileLayer) map.removeLayer(currentTileLayer);
+        if (theme === 'light') {
+          currentTileLayer = lightTileLayer;
+          if (iconEl) iconEl.innerText = '🌙';
+          if (textEl) textEl.innerText = 'Dark Mode';
+        } else {
+          currentTileLayer = darkTileLayer;
+          if (iconEl) iconEl.innerText = '☀️';
+          if (textEl) textEl.innerText = 'Light Mode';
+        }
+        currentTileLayer.addTo(map);
+      }
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      setTheme(next);
+    }
+
+    function switchNavTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      if (tabId === 'planner') {
+        document.getElementById('navBtn-planner').classList.add('active');
+        document.getElementById('content-planner').style.display = 'flex';
+        document.getElementById('content-predictions').style.display = 'none';
+      } else {
+        document.getElementById('navBtn-predictions').classList.add('active');
+        document.getElementById('content-planner').style.display = 'none';
+        document.getElementById('content-predictions').style.display = 'flex';
+      }
+    }
+
+    function selectConstraint(cardEl) {
+      document.querySelectorAll('.constraint-card').forEach(c => c.classList.remove('active'));
+      cardEl.classList.add('active');
+    }
+
+    // Leaflet Camera Icons
     const cctvIconHtml = `<div class="custom-marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> CCTV AI</div>`;
     const cctvIcon = L.divIcon({ className: '', html: cctvIconHtml, iconSize: [80, 28], iconAnchor: [40, 14] });
 
-    let currentRouteLine = null;
-    let globalRoutes = [];
-
     let allCamMarkers = [];
     let routeLayers = [];
+    let globalRoutes = [];
 
     async function loadTfLCameras() {
       try {
@@ -410,10 +687,7 @@
     }
 
     function selectCamera(name, videoUrl, imageUrl) {
-      switchTab('predictions');
-      document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-      document.querySelector('.tab-btn:nth-child(2)').classList.remove('active');
-
+      switchNavTab('predictions');
       document.getElementById('camNameMeta').innerText = name.toUpperCase();
       document.getElementById('videoHudText').innerText = `● REC | ${name.substring(0,30).toUpperCase()}`;
 
@@ -482,7 +756,6 @@
 
         allCamMarkers.forEach(item => {
           if (selectedCamNames.has(item.name)) return;
-
           const d = haversineKm(item.lat, item.lon, targetLat, targetLon);
           if (d < bestDist) {
             bestDist = d;
@@ -552,9 +825,9 @@
       routeLayers.forEach(l => map.removeLayer(l));
       routeLayers = [];
 
-      const colors = ['#37C871', '#FF5C5C', '#F2A93B'];
+      const colors = ['#2563EB', '#DC2626', '#D97706'];
 
-      // Draw background alternative routes
+      // Draw background alt routes
       [0, 1, 2].forEach(i => {
         if (i !== index && globalRoutes[i]) {
           const altLayer = L.geoJSON(globalRoutes[i], {
@@ -564,7 +837,7 @@
         }
       });
 
-      // Draw selected main route on top
+      // Draw main route
       if (globalRoutes[index]) {
         const mainLayer = L.geoJSON(globalRoutes[index], {
           style: { color: colors[index], weight: 7, opacity: 0.95 }
@@ -574,20 +847,14 @@
         map.fitBounds(mainLayer.getBounds(), { padding: [60, 60] });
       }
 
-      // Reset sidebar card styles
+      // Reset route card styles
       [0, 1, 2].forEach(i => {
         const card = document.getElementById(`card-${i}`);
         if (card) {
           card.style.opacity = (i === index) ? '1' : '0.6';
-          if (i === index) {
-            card.style.borderColor = i === 0 ? 'var(--green)' : (i === 1 ? 'var(--red)' : 'var(--amber)');
-          } else {
-            card.style.borderColor = 'var(--line)';
-          }
         }
       });
 
-      // Filter and highlight route cameras vs transparent off-route cameras
       updateRouteCameraVisibility(index);
     }
 
@@ -601,7 +868,7 @@
       const origin = document.getElementById('originInput').value;
       const dest = document.getElementById('destInput').value;
 
-      const btn = document.querySelector('.find-btn');
+      const btn = document.querySelector('.btn-calculate');
       const origText = btn.innerHTML;
       btn.innerHTML = "CALCULATING ROAD NETWORK...";
 
@@ -621,11 +888,8 @@
           return;
         }
 
-        // Generate midpoints to FORCE entirely different routes from OSRM
         const latDiff = end.lat - start.lat;
         const lonDiff = end.lon - start.lon;
-        
-        // Push perpendicular to the main axis
         const mid1 = { lat: start.lat + latDiff/2 + lonDiff*0.2, lon: start.lon + lonDiff/2 - latDiff*0.2 };
         const mid2 = { lat: start.lat + latDiff/2 - lonDiff*0.2, lon: start.lon + lonDiff/2 + latDiff*0.2 };
 
@@ -635,7 +899,6 @@
           return await res.json();
         };
 
-        // Fetch 3 completely distinct routes concurrently
         const [res0, res1, res2] = await Promise.all([
           fetchRoute([start, end]),
           fetchRoute([start, mid1, end]),
@@ -654,36 +917,27 @@
           res2.routes[0].geometry
         ];
 
-        // Route 0 (Optimal AI)
         const d0 = (res0.routes[0].distance / 1000).toFixed(1);
         const t0 = Math.round(res0.routes[0].duration / 60);
-        
-        // Route 1 (Standard Congested)
         const d1 = (res1.routes[0].distance / 1000).toFixed(1);
         const t1 = Math.round(res1.routes[0].duration / 60) + Math.floor(Math.random()*15 + 10);
-        const jamTime1 = getFutureTimeStr(15); // Congestion in +15m
-        
-        // Route 2 (Alternative)
+        const jamTime1 = getFutureTimeStr(15);
         const d2 = (res2.routes[0].distance / 1000).toFixed(1);
         const t2 = Math.round(res2.routes[0].duration / 60) + Math.floor(Math.random()*5 + 5);
-        const jamTime2 = getFutureTimeStr(30);
 
         document.getElementById('stats-0').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t0} min</b> ETA</span><span><b>${d0} km</b></span><span style="color:#37C871;"><b>Low Traffic</b></span></div>
-             <div style="font-size:10px; color:var(--text-faint); margin-top:2px;">Clear through ${getFutureTimeStr(60)}</div>
+          `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
+             <span><b>${t0} min</b> ETA (${d0} km)</span><span style="color:var(--green); font-weight:700;">Optimal Flow</span>
            </div>`;
 
         document.getElementById('stats-1').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t1} min</b> ETA</span><span><b>${d1} km</b></span><span style="color:#FF5C5C;"><b>Heavy Load</b></span></div>
-             <div style="font-size:10px; color:#FF5C5C; opacity:0.8; margin-top:2px;">⚠️ Peak congestion expected at ${jamTime1}</div>
+          `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
+             <span><b>${t1} min</b> ETA (${d1} km)</span><span style="color:var(--red); font-weight:700;">Peak Jam</span>
            </div>`;
            
         document.getElementById('stats-2').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t2} min</b> ETA</span><span><b>${d2} km</b></span><span style="color:#F2A93B;"><b>Moderate</b></span></div>
-             <div style="font-size:10px; color:#F2A93B; opacity:0.8; margin-top:2px;">⚠️ Slowdowns expected by ${jamTime2}</div>
+          `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
+             <span><b>${t2} min</b> ETA (${d2} km)</span><span style="color:var(--amber); font-weight:700;">Moderate</span>
            </div>`;
 
         document.getElementById('routeResults').style.display = 'block';
@@ -695,44 +949,15 @@
       btn.innerHTML = origText;
     }
 
-    // Curated London Locations for Instant Suggestion
+    // Popular London places for instant lookup
     const popularLondonPlaces = [
-      "Piccadilly Circus, London",
-      "Heathrow Airport, London",
-      "Gatwick Airport, London",
-      "London City Airport, London",
-      "King's Cross Station, London",
-      "St Pancras International, London",
-      "Paddington Station, London",
-      "Waterloo Station, London",
-      "Victoria Station, London",
-      "London Bridge Station, London",
-      "Liverpool Street Station, London",
-      "Euston Station, London",
-      "Big Ben, Westminster, London",
-      "London Eye, South Bank, London",
-      "Tower Bridge, London",
-      "Tower of London, London",
-      "Buckingham Palace, London",
-      "Trafalgar Square, London",
-      "Oxford Street, London",
-      "Regent Street, London",
-      "Covent Garden, London",
-      "Soho, London",
-      "Camden Market, London",
-      "Canary Wharf, London",
-      "Hyde Park, London",
-      "Regent's Park, London",
-      "Greenwich Observatory, London",
-      "Westminster Abbey, London",
-      "St Paul's Cathedral, London",
-      "British Museum, London",
-      "Natural History Museum, London",
-      "Wembley Stadium, London",
-      "O2 Arena, Greenwich, London",
-      "Stratford Westfield, London",
-      "Knightsbridge, London",
-      "Harrods, Knightsbridge, London"
+      "Piccadilly Circus, London", "Heathrow Airport, London", "Gatwick Airport, London",
+      "King's Cross Station, London", "St Pancras International, London", "Paddington Station, London",
+      "Waterloo Station, London", "Victoria Station, London", "London Bridge Station, London",
+      "Big Ben, Westminster, London", "London Eye, South Bank, London", "Tower Bridge, London",
+      "Buckingham Palace, London", "Trafalgar Square, London", "Oxford Street, London",
+      "Regent Street, London", "Covent Garden, London", "Soho, London", "Camden Market, London",
+      "Canary Wharf, London", "Hyde Park, London", "Wembley Stadium, London", "O2 Arena, Greenwich, London"
     ];
 
     function escapeQuotes(str) {
@@ -754,14 +979,9 @@
           return;
         }
 
-        // 1. Instant local match from preloaded popular places
-        const localMatches = popularLondonPlaces.filter(p => 
-          p.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 5);
-
+        const localMatches = popularLondonPlaces.filter(p => p.toLowerCase().includes(query.toLowerCase())).slice(0, 5);
         renderAutocompleteResults(localMatches, resultsEl, inputEl);
 
-        // 2. Live API search with Photon / Nominatim for full London street & place coverage
         debounceTimer = setTimeout(async () => {
           try {
             const apiRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + ' London')}&lat=51.5074&lon=-0.1278&limit=6`);
@@ -772,24 +992,19 @@
                   const props = f.properties;
                   const name = props.name || props.street || '';
                   const city = props.city || props.district || 'London';
-                  if (!name) return null;
-                  return `${name}, ${city}`;
+                  return name ? `${name}, ${city}` : null;
                 }).filter(Boolean);
 
                 const combined = Array.from(new Set([...localMatches, ...apiPlaces])).slice(0, 6);
                 renderAutocompleteResults(combined, resultsEl, inputEl);
               }
             }
-          } catch(e) {
-            console.log("Autocomplete API error:", e);
-          }
+          } catch(e) { console.log(e); }
         }, 150);
       });
 
       inputEl.addEventListener('focus', function() {
-        if (this.value.trim().length >= 1) {
-          this.dispatchEvent(new Event('input'));
-        }
+        if (this.value.trim().length >= 1) this.dispatchEvent(new Event('input'));
       });
     }
 
@@ -802,12 +1017,10 @@
 
       resultsEl.innerHTML = items.map(item => `
         <div class="autocomplete-item" onclick="selectAutocomplete('${escapeQuotes(item)}', '${inputEl.id}', '${resultsEl.id}')">
-          <div class="autocomplete-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          </div>
-          <div class="autocomplete-text-container">
-            <div class="autocomplete-title">${item}</div>
-            <div class="autocomplete-sub">London, UK</div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          <div>
+            <div style="font-weight:600;">${item}</div>
+            <div style="font-size:11px; color:var(--text-dim);">London, UK</div>
           </div>
         </div>
       `).join('');
@@ -823,9 +1036,7 @@
 
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.search-field-wrapper')) {
-        document.querySelectorAll('.autocomplete-results').forEach(el => {
-          el.style.display = 'none';
-        });
+        document.querySelectorAll('.autocomplete-results').forEach(el => el.style.display = 'none');
       }
     });
 
@@ -834,15 +1045,9 @@
 
     function clearInput(inputId, resultsId) {
       const inputEl = document.getElementById(inputId);
-      if (inputEl) {
-        inputEl.value = '';
-        inputEl.focus();
-      }
+      if (inputEl) { inputEl.value = ''; inputEl.focus(); }
       const resultsEl = document.getElementById(resultsId);
-      if (resultsEl) {
-        resultsEl.style.display = 'none';
-        resultsEl.innerHTML = '';
-      }
+      if (resultsEl) { resultsEl.style.display = 'none'; resultsEl.innerHTML = ''; }
     }
 
     function resetRouteAndCameras() {
@@ -874,9 +1079,9 @@
       map.setView([51.5074, -0.1278], 11);
     }
 
-    // Initialize Map and load full global state/city dataset
+    // Initialize Map and load TfL Cameras
+    initMap();
     loadTfLCameras();
-
   </script>
 </body>
 </html>
