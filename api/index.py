@@ -52,6 +52,21 @@ class handler(BaseHTTPRequestHandler):
             path = '/'
         query = parse_qs(parsed.query)
 
+        # 0. Serve index.html Dashboard on Root URL
+        if path in ["/", "/index.html", "/dashboard"]:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            index_file = os.path.join(base_dir, "index.html")
+            if os.path.exists(index_file):
+                with open(index_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                self._send_cors()
+                self.end_headers()
+                self.wfile.write(content.encode('utf-8'))
+                return
+
         # 1. Select Camera Source Endpoint
         if path == "/api/video/select_camera":
             cam_name = query.get("name", [CURRENT_CAM["name"]])[0]
