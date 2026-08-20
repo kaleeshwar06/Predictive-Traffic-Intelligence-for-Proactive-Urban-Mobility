@@ -1,9 +1,25 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "rewrites": [
-    { "source": "/", "destination": "/innohack/traffic_dashboard.html" },
-    { "source": "/index.html", "destination": "/innohack/traffic_dashboard.html" },
-    { "source": "/dashboard", "destination": "/innohack/traffic_dashboard.html" }
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "innohack/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/index.html", "dest": "/index.html" },
+    { "src": "/dashboard", "dest": "/index.html" },
+    { "src": "/innohack/(.*)", "dest": "/innohack/$1" }
   ]
 }
