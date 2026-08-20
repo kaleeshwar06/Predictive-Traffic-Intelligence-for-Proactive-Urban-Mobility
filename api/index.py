@@ -243,3 +243,13 @@ class handler(BaseHTTPRequestHandler):
         out_buf = io.BytesIO()
         img.save(out_buf, format="JPEG", quality=85)
         return out_buf.getvalue()
+
+if __name__ == "__main__":
+    from http.server import HTTPServer
+    port = int(os.environ.get("PORT", 8000))
+    print(f"Starting RoutePulse Traffic AI Server on http://localhost:{port} ...")
+    server = HTTPServer(("0.0.0.0", port), handler)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")

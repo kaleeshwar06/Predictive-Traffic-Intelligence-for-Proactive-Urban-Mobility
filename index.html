@@ -469,11 +469,20 @@
     <div class="whatif-header">
       <div class="whatif-title">
         <span class="eyebrow"></span>
-        INTERACTIVE "WHAT-IF" TRAFFIC SCENARIO SIMULATOR
+        INTERACTIVE "WHAT-IF" TRAFFIC & WEATHER SIMULATOR
       </div>
-      <div class="whatif-sub">CONTROL PANEL FOR HACKATHON DEMO</div>
+      <div class="whatif-sub">2-3 HOUR PREDICTIVE ROUTE FORECAST ENGINE</div>
     </div>
     <div class="whatif-controls">
+      <div class="slider-group" style="flex: 1.1; min-width: 250px;">
+        <span>🔮 PREDICT HORIZON:</span>
+        <select id="forecastTimeHorizon" onchange="run2To3HourPrediction()" style="background:var(--panel-alt); color:var(--amber); border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-family:var(--font-mono); font-size:11px; font-weight:bold; cursor:pointer; outline:none; max-width:220px;">
+          <option value="0">Live Real-Time (Now)</option>
+          <option value="1">+1 Hour Forecast</option>
+          <option value="2" selected>+2 Hours Forecast (Rain & Congestion)</option>
+          <option value="3">+3 Hours Forecast (Rain & Congestion)</option>
+        </select>
+      </div>
       <div class="slider-group">
         <span>TRAFFIC VOLUME SPIKE: <strong id="spikeValueText" style="color:var(--amber);">+0%</strong></span>
         <input type="range" id="volumeSpikeSlider" min="0" max="100" value="0" oninput="onSimulationInputChange()">
@@ -484,6 +493,7 @@
         <label class="checkbox-item"><input type="checkbox" id="simClosureCheck" onchange="onSimulationInputChange()"> 🚧 Lane Closure</label>
       </div>
       <button type="button" class="apply-sim-btn" id="applySimBtn" onclick="applySimulationScenario()">APPLY SIMULATION</button>
+      <button type="button" class="apply-sim-btn" id="predict23Btn" style="background: linear-gradient(135deg, #F2A93B, #d18f28); color: #000;" onclick="run2To3HourPrediction()">🔮 PREDICT 2-3h IMPACT</button>
     </div>
   </div>
 
@@ -739,6 +749,9 @@
             camsLoaded++;
           }
         });
+        // Initial route calculation & 2-3 hour predictive forecast execution
+        await calculateRoute();
+        run2To3HourPrediction(2);
       } catch(e) { console.log(e); }
     }
 
@@ -1272,6 +1285,131 @@
       updateSimulationMapMarkers();
     }
 
+    // ===== Live London Weather via Open-Meteo API (No API Key Required) =====
+    async function fetchLondonWeatherForecast(hoursAhead) {
+      try {
+        // London coordinates: 51.5074°N, -0.1278°W
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current_weather=true&hourly=precipitation_probability,rain,weathercode&timezone=Europe%2FLondon&forecast_days=1`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Weather API unavailable');
+        const data = await res.json();
+
+        // Get current hour in London time
+        const now = new Date();
+        const londonHour = parseInt(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(now));
+        const targetIdx = Math.min(23, londonHour + hoursAhead);
+
+        const rainProb = data.hourly && data.hourly.precipitation_probability ? data.hourly.precipitation_probability[targetIdx] : 0;
+        const rainMm = data.hourly && data.hourly.rain ? data.hourly.rain[targetIdx] : 0;
+        const wCode = data.hourly && data.hourly.weathercode ? data.hourly.weathercode[targetIdx] : 0;
+        const currentCode = data.current_weather ? data.current_weather.weathercode : 0;
+
+        // WMO weather codes: >=51 = drizzle/rain, >=61 = rain, >=80 = showers
+        const isRainingNow = currentCode >= 51;
+        const isRainExpected = rainProb > 40 || rainMm > 0.2 || wCode >= 51;
+
+        return {
+          rainProbability: rainProb,
+          rainMmExpected: rainMm,
+          isRainingNow,
+          isRainExpected,
+          source: 'LIVE',
+          dataTag: `Open-Meteo API | London ${rainProb}% rain probability`
+        };
+      } catch (e) {
+        // Graceful fallback: use hash-based heuristic if API unavailable
+        return { rainProbability: 0, rainMmExpected: 0, isRainingNow: false, isRainExpected: null, source: 'FALLBACK', dataTag: 'Estimated (Weather API unavailable)' };
+      }
+    }
+
+    async function run2To3HourPrediction(hoursAheadOverride) {
+      const selectEl = document.getElementById('forecastTimeHorizon');
+      let hoursAhead = hoursAheadOverride !== undefined ? hoursAheadOverride : parseInt(selectEl ? selectEl.value : 2);
+
+      if (hoursAhead === 0) {
+        document.getElementById('volumeSpikeSlider').value = 0;
+        document.getElementById('simRainCheck').checked = false;
+        document.getElementById('simAccidentCheck').checked = false;
+        document.getElementById('simClosureCheck').checked = false;
+        const spikeText = document.getElementById('spikeValueText');
+        if (spikeText) spikeText.innerText = '+0%';
+        applySimulationScenario();
+
+        const forecastEl = document.getElementById('forecastStatus');
+        if (forecastEl) {
+          forecastEl.innerText = 'MODERATE TRAFFIC';
+          forecastEl.style.color = 'var(--amber)';
+        }
+        return;
+      }
+
+      const now = new Date();
+      const targetHour = (now.getHours() + hoursAhead) % 24;
+
+      // 1. Fetch 24-hour historical congestion pattern for the target hour
+      const hourlyData = generate24HourCongestionData();
+      const predictedCongestion = hourlyData[targetHour];
+
+      // Map congestion to slider spike percentage
+      const baseAvg = 45;
+      let predictedSpike = Math.max(0, Math.min(100, Math.round((predictedCongestion - baseAvg) * 1.6)));
+      if (predictedCongestion > 65) predictedSpike = Math.max(predictedSpike, 55);
+
+      // 2. LIVE WEATHER API — Fetch real London rain prediction from Open-Meteo
+      const forecastEl = document.getElementById('forecastStatus');
+      if (forecastEl) {
+        forecastEl.innerHTML = `<div style="font-size:12px; color:#00E5FF;">⏳ Fetching live London weather data...</div>`;
+      }
+
+      const weather = await fetchLondonWeatherForecast(hoursAhead);
+
+      // Determine rain prediction: prefer live API, fall back to hash heuristic
+      let isRainPredicted;
+      let weatherSourceTag;
+      if (weather.source === 'LIVE') {
+        isRainPredicted = weather.isRainExpected;
+        weatherSourceTag = `<span style="color:#37C871; font-size:10px; margin-left:6px;">● LIVE API</span>`;
+      } else {
+        // Fallback: hash-based heuristic
+        let hash = 0;
+        const loc = activeLocationName || "Central London Grid";
+        for (let i = 0; i < loc.length; i++) { hash = (hash << 5) - hash + loc.charCodeAt(i); hash |= 0; }
+        hash = Math.abs(hash);
+        isRainPredicted = ((targetHour + (hash % 7)) % 2 === 0) || (hoursAhead === 2);
+        weatherSourceTag = `<span style="color:#F2A93B; font-size:10px; margin-left:6px;">● ESTIMATED</span>`;
+      }
+
+      // 3. Update simulator controls automatically with 2-3 hour AI + Weather forecast
+      const slider = document.getElementById('volumeSpikeSlider');
+      if (slider) slider.value = predictedSpike;
+
+      const rainCheck = document.getElementById('simRainCheck');
+      if (rainCheck) rainCheck.checked = isRainPredicted;
+
+      const spikeText = document.getElementById('spikeValueText');
+      if (spikeText) spikeText.innerText = `+${predictedSpike}%`;
+
+      // Trigger scenario recalculation across map, ETAs, and routing engine
+      applySimulationScenario();
+
+      // 4. Update MODEL 1 FORECAST status panel with real weather data
+      if (forecastEl) {
+        const rainTag = isRainPredicted ? '🌧️ RAIN PREDICTED' : '☀️ CLEAR WEATHER';
+        const congLevel = predictedCongestion > 65 ? 'HIGH CONGESTION' : predictedCongestion > 40 ? 'MODERATE CONGESTION' : 'LOW CONGESTION';
+        const congColor = predictedCongestion > 65 ? 'var(--red)' : predictedCongestion > 40 ? 'var(--amber)' : 'var(--green)';
+        const formattedTime = (targetHour < 10 ? '0' + targetHour : targetHour) + ':00';
+        const probLine = weather.source === 'LIVE' ? `<div style="font-size:11px; color:var(--text-dim); margin-top:3px;">Rain Probability: <b style="color:#00E5FF;">${weather.rainProbability}%</b> &nbsp;|&nbsp; Expected Rain: <b style="color:#00E5FF;">${weather.rainMmExpected.toFixed(1)} mm</b></div>` : '';
+
+        forecastEl.innerHTML = `
+          <div style="font-size:14px; color:#00E5FF; font-weight:700; margin-bottom:4px;">🔮 +${hoursAhead}h FORECAST (${formattedTime}) ${weatherSourceTag}</div>
+          <div style="color:${congColor}; font-size:20px; font-weight:800;">${congLevel} (${predictedCongestion}%)</div>
+          <div style="font-size:12px; color:#FFF; margin-top:4px;">PREDICTED ATMOSPHERE: <b style="color:#00E5FF;">${rainTag}</b></div>
+          ${probLine}
+          <div style="font-size:10px; color:var(--text-dim); margin-top:4px; font-family:var(--font-mono);">📡 ${weather.dataTag}</div>
+        `;
+      }
+    }
+
     function updateSimulationMapMarkers() {
       if (!map) return;
       simMapMarkers.forEach(m => map.removeLayer(m));
@@ -1678,6 +1816,28 @@
             <rect x="0" y="0" width="70" height="15" rx="3" fill="rgba(10,14,23,0.9)" stroke="#00E5FF" stroke-width="0.8"/>
             <text x="35" y="11" fill="#00E5FF" font-size="8" font-weight="bold" font-family="var(--font-mono)" text-anchor="middle">NOW: ${currentCongestion}%</text>
           </g>
+
+          <!-- Target Forecast Horizon Marker -->
+          ${(() => {
+            const selectEl = document.getElementById('forecastTimeHorizon');
+            const hAhead = parseInt(selectEl ? selectEl.value : 0);
+            if (hAhead > 0) {
+              const targetH = (currentHour + hAhead) % 24;
+              const targetFraction = targetH / 23;
+              const targetX = paddingLeft + Math.min(1, Math.max(0, targetFraction)) * chartW;
+              const targetVal = data[Math.min(23, targetH)];
+              const targetY = paddingTop + chartH - (targetVal / 100) * chartH;
+              return `
+                <line x1="${targetX}" y1="${paddingTop}" x2="${targetX}" y2="${paddingTop + chartH}" stroke="#F2A93B" stroke-width="1.5" stroke-dasharray="3,3"/>
+                <circle cx="${targetX}" cy="${targetY}" r="4" fill="#F2A93B"/>
+                <g transform="translate(${Math.min(chartW - 65, Math.max(paddingLeft, targetX - 35))}, ${Math.min(chartH - 5, Math.max(4, targetY + 6))})">
+                  <rect x="0" y="0" width="72" height="15" rx="3" fill="rgba(10,14,23,0.92)" stroke="#F2A93B" stroke-width="0.9"/>
+                  <text x="36" y="11" fill="#F2A93B" font-size="8" font-weight="bold" font-family="var(--font-mono)" text-anchor="middle">+${hAhead}h: ${targetVal}%</text>
+                </g>
+              `;
+            }
+            return '';
+          })()}
         </svg>
       `;
 
