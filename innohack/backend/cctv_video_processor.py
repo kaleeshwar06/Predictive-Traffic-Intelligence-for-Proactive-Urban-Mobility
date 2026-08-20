@@ -164,14 +164,23 @@ class CCTVVideoProcessor:
         # Vehicle class IDs in COCO: 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
         vehicle_cls_ids = [1, 2, 3, 5, 7]
         
-        results = self.model.track(
-            frame,
-            persist=True,
-            conf=self.conf_threshold,
-            iou=0.45,
-            classes=vehicle_cls_ids,
-            verbose=False
-        )
+        try:
+            results = self.model.track(
+                frame,
+                persist=True,
+                conf=self.conf_threshold,
+                iou=0.45,
+                classes=vehicle_cls_ids,
+                verbose=False
+            )
+        except Exception:
+            results = self.model.predict(
+                frame,
+                conf=self.conf_threshold,
+                iou=0.45,
+                classes=vehicle_cls_ids,
+                verbose=False
+            )
         t_infer = (time.time() - t_infer_start) * 1000.0 # ms
 
         # 3. Extract & Filter Real Detections
