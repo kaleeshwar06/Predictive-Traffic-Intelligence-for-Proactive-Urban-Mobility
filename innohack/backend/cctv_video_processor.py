@@ -71,16 +71,43 @@ class CCTVVideoProcessor:
         self._init_video_capture(self.current_camera_url)
 
     def _init_video_capture(self, url: str):
-        """Initializes or updates camera URL source instantly."""
+        """Initializes OpenCV VideoCapture for real moving MP4 video stream."""
         if self.cap is not None:
             try:
                 self.cap.release()
             except Exception:
                 pass
             self.cap = None
-        self.current_camera_url = url
+        
+        # Convert .jpg snapshot URLs to .mp4 video stream URLs
+        mp4_url = url
+        if mp4_url.endswith('.jpg'):
+            mp4_url = mp4_url[:-4] + '.mp4'
+        elif not mp4_url.endswith('.mp4') and 'jamcams' in mp4_url:
+            mp4_url += '.mp4'
+
+        self.current_camera_url = mp4_url
         self.frame_index = 0
-        print(f"[YOLO ENGINE] Set Active Video Camera Source: {url}")
+        
+        # Download MP4 video stream bytes for zero-latency frame-by-frame reading
+        if mp4_url.startswith("http://") or mp4_url.startswith("https://"):
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(mp4_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=3, context=ctx) as resp:
+                    vid_bytes = resp.read()
+                    temp_mp4 = os.path.join(os.path.dirname(__file__), "active_cctv_stream.mp4")
+                    with open(temp_mp4, "wb") as f:
+                        f.write(vid_bytes)
+                    self.cap = cv2.VideoCapture(temp_mp4)
+                    print(f"[YOLO ENGINE] Successfully Loaded Real Moving MP4 Video Stream: {mp4_url}")
+            except Exception as e:
+                print(f"[YOLO ENGINE] Could not fetch remote MP4 ({e}), falling back to snapshot.")
+                self.cap = None
+        else:
+            self.cap = cv2.VideoCapture(mp4_url)
 
     def set_camera_source(self, name: str, image_url: str):
         """Dynamically updates active CCTV camera stream source with zero latency."""
@@ -92,7 +119,7 @@ class CCTVVideoProcessor:
 
     def process_next_frame(self) -> Dict[str, Any]:
         """
-        Reads frame from live camera stream, runs real Ultralytics YOLOv8 inference & tracking,
+        Reads consecutive moving frame from real MP4 video stream, runs real Ultralytics YOLOv8 inference & tracking,
         filters vehicle detections, draws bounding boxes, and calculates PCU stats.
         """
         t_start = time.time()
@@ -100,26 +127,28 @@ class CCTVVideoProcessor:
         
         frame = None
 
-        # 1. Fetch live camera snapshot directly via HTTP if network URL
-        if self.current_camera_url and (self.current_camera_url.startswith("http://") or self.current_camera_url.startswith("https://")):
+        # 1. Read sequential frame from real moving MP4 video stream
+        if self.cap is not None and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                # Rewind video seamlessly when reaching the end of the clip
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = self.cap.read()
+
+        # 2. Fallback to live image snapshot if video file temporarily unavailable
+        if frame is None and self.current_camera_url:
+            jpg_url = self.current_camera_url.replace('.mp4', '.jpg')
             try:
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-                req = urllib.request.Request(self.current_camera_url, headers={'User-Agent': 'Mozilla/5.0'})
+                req = urllib.request.Request(jpg_url, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req, timeout=2, context=ctx) as resp:
                     img_data = resp.read()
                     arr = np.frombuffer(img_data, np.uint8)
                     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             except Exception:
                 frame = None
-
-        # 2. Fallback to OpenCV VideoCapture if local video file or RTSP stream
-        if frame is None and self.cap is not None and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if not ret or frame is None:
-                self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                ret, frame = self.cap.read()
 
         # 3. Fallback dark canvas if stream temporarily unreachable
         if frame is None:
@@ -131,12 +160,6 @@ class CCTVVideoProcessor:
                     cv2.line(frame, (x, y), (x + 25, y), (180, 180, 180), 2)
 
         h, w, _ = frame.shape
-
-        # Apply smooth micro-motion shift so the CCTV feed flows continuously like live video
-        shift_x = int((self.frame_index * 2) % 12) - 6
-        if shift_x != 0:
-            M = np.float32([[1, 0, shift_x], [0, 1, 0]])
-            frame = cv2.warpAffine(frame, M, (w, h), borderMode=cv2.BORDER_REFLECT)
         t_infer_start = time.time()
         # Vehicle class IDs in COCO: 1: bicycle, 2: car, 3: motorcycle, 5: bus, 7: truck
         vehicle_cls_ids = [1, 2, 3, 5, 7]

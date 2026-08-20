@@ -1876,13 +1876,13 @@
       }
     }
 
-    // Keep live video feed playing continuously without freezing
+    // Keep live video feed playing continuously without freezing at 10 FPS
     setInterval(() => {
       const img = document.getElementById('liveImg');
       if (img && img.style.display !== 'none') {
         img.src = '/api/video/feed?t=' + Date.now();
       }
-    }, 200);
+    }, 100);
 
     setInterval(syncYoloTelemetry, 1000);
     syncYoloTelemetry();
