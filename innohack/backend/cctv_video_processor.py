@@ -120,12 +120,12 @@ class CCTVVideoProcessor:
                 self.cap = cv2.VideoCapture(mp4_url)
 
     def set_camera_source(self, name: str, image_url: str):
-        """Dynamically updates active CCTV camera stream source with zero latency."""
+        """Dynamically updates active CCTV camera stream source asynchronously with zero latency."""
         if name:
             self.current_camera_name = str(name).upper()
         if image_url:
-            self._init_video_capture(image_url)
-        print(f"[YOLO ENGINE] Switched Active Video Camera: {self.current_camera_name} -> {self.current_camera_url}")
+            threading.Thread(target=self._init_video_capture, args=(image_url,), daemon=True).start()
+        print(f"[YOLO ENGINE] Async Switched Active Video Camera: {self.current_camera_name}")
 
     def process_next_frame(self) -> Dict[str, Any]:
         """
