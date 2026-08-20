@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/innohack/traffic_dashboard.html" },
+    { "source": "/index.html", "destination": "/innohack/traffic_dashboard.html" },
+    { "source": "/dashboard", "destination": "/innohack/traffic_dashboard.html" }
+  ]
+}
