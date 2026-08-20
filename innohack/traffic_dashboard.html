@@ -67,6 +67,13 @@
   .status-dot{ width:7px; height:7px; border-radius:50%; background: var(--green); box-shadow:0 0 8px var(--green); animation: blink 2s infinite; }
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
 
+  .clock-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--amber);
+    padding: 6px 14px; background: rgba(242, 169, 59, 0.1); border-radius: 20px;
+    border: 1px solid rgba(242, 169, 59, 0.35); box-shadow: 0 0 10px rgba(242, 169, 59, 0.15);
+  }
+
   /* ===== Main Layout ===== */
   .main-container { display: flex; flex: 1; overflow: hidden; }
 
@@ -216,6 +223,10 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="clock-pill">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="headerLiveClock">--:--:-- --</span>
+      </div>
       <div class="status-pill"><span class="status-dot"></span><span id="backendStatusText">GLOBAL API LINK ACTIVE</span></div>
     </div>
   </header>
@@ -650,41 +661,24 @@
 
         globalRoutes = [
           res0.routes[0].geometry,
-          res1.routes[0].geometry,
-          res2.routes[0].geometry
+          res1.routes && res1.routes[0] ? res1.routes[0].geometry : res0.routes[0].geometry,
+          res2.routes && res2.routes[0] ? res2.routes[0].geometry : res0.routes[0].geometry
         ];
 
         // Route 0 (Optimal AI)
         const d0 = (res0.routes[0].distance / 1000).toFixed(1);
         const t0 = Math.round(res0.routes[0].duration / 60);
-        
+
         // Route 1 (Standard Congested)
-        const d1 = (res1.routes[0].distance / 1000).toFixed(1);
-        const t1 = Math.round(res1.routes[0].duration / 60) + Math.floor(Math.random()*15 + 10);
-        const jamTime1 = getFutureTimeStr(15); // Congestion in +15m
-        
+        const d1 = res1.routes && res1.routes[0] ? (res1.routes[0].distance / 1000).toFixed(1) : (parseFloat(d0) * 1.15).toFixed(1);
+        const t1 = res1.routes && res1.routes[0] ? Math.round(res1.routes[0].duration / 60) + Math.floor(Math.random()*15 + 10) : t0 + 15;
+
         // Route 2 (Alternative)
-        const d2 = (res2.routes[0].distance / 1000).toFixed(1);
-        const t2 = Math.round(res2.routes[0].duration / 60) + Math.floor(Math.random()*5 + 5);
-        const jamTime2 = getFutureTimeStr(30);
+        const d2 = res2.routes && res2.routes[0] ? (res2.routes[0].distance / 1000).toFixed(1) : (parseFloat(d0) * 1.08).toFixed(1);
+        const t2 = res2.routes && res2.routes[0] ? Math.round(res2.routes[0].duration / 60) + Math.floor(Math.random()*5 + 5) : t0 + 7;
 
-        document.getElementById('stats-0').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t0} min</b> ETA</span><span><b>${d0} km</b></span><span style="color:#37C871;"><b>Low Traffic</b></span></div>
-             <div style="font-size:10px; color:var(--text-faint); margin-top:2px;">Clear through ${getFutureTimeStr(60)}</div>
-           </div>`;
-
-        document.getElementById('stats-1').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t1} min</b> ETA</span><span><b>${d1} km</b></span><span style="color:#FF5C5C;"><b>Heavy Load</b></span></div>
-             <div style="font-size:10px; color:#FF5C5C; opacity:0.8; margin-top:2px;">⚠️ Peak congestion expected at ${jamTime1}</div>
-           </div>`;
-           
-        document.getElementById('stats-2').innerHTML = 
-          `<div style="display:flex; flex-direction:column; gap:4px; width:100%;">
-             <div style="display:flex; justify-content:space-between;"><span><b>${t2} min</b> ETA</span><span><b>${d2} km</b></span><span style="color:#F2A93B;"><b>Moderate</b></span></div>
-             <div style="font-size:10px; color:#F2A93B; opacity:0.8; margin-top:2px;">⚠️ Slowdowns expected by ${jamTime2}</div>
-           </div>`;
+        currentRouteParams = { t0, d0, t1, d1, t2, d2 };
+        renderRouteETACards();
 
         document.getElementById('routeResults').style.display = 'block';
         drawSelectedRoute(0);
@@ -845,9 +839,70 @@
       }
     }
 
+    // Live Real-Time Clock & Dynamic Route ETA Integration
+    let currentRouteParams = null;
+
+    function updateHeaderClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const clockEl = document.getElementById('headerLiveClock');
+      if (clockEl) {
+        clockEl.innerText = timeStr;
+      }
+      if (currentRouteParams) {
+        renderRouteETACards();
+      }
+    }
+
+    function calculateArrival(minutesToAdd) {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() + minutesToAdd);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderRouteETACards() {
+      if (!currentRouteParams) return;
+      const { t0, d0, t1, d1, t2, d2 } = currentRouteParams;
+      
+      const arr0 = calculateArrival(t0);
+      const arr1 = calculateArrival(t1);
+      const arr2 = calculateArrival(t2);
+
+      const stats0 = document.getElementById('stats-0');
+      if (stats0) {
+        stats0.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+             <div style="display:flex; justify-content:space-between;"><span><b>${t0} min</b> ETA</span><span><b>${d0} km</b></span><span style="color:#37C871;"><b>Low Traffic</b></span></div>
+             <div style="font-size:11px; color:#37C871; margin-top:2px;">🕒 Estimated Arrival: <b>${arr0}</b></div>
+           </div>`;
+      }
+
+      const stats1 = document.getElementById('stats-1');
+      if (stats1) {
+        stats1.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+             <div style="display:flex; justify-content:space-between;"><span><b>${t1} min</b> ETA</span><span><b>${d1} km</b></span><span style="color:#FF5C5C;"><b>Heavy Load</b></span></div>
+             <div style="font-size:11px; color:#FF5C5C; margin-top:2px;">🕒 Estimated Arrival: <b>${arr1}</b></div>
+           </div>`;
+      }
+
+      const stats2 = document.getElementById('stats-2');
+      if (stats2) {
+        stats2.innerHTML = `
+          <div style="display:flex; flex-direction:column; gap:4px; width:100%;">
+             <div style="display:flex; justify-content:space-between;"><span><b>${t2} min</b> ETA</span><span><b>${d2} km</b></span><span style="color:#F2A93B;"><b>Moderate</b></span></div>
+             <div style="font-size:11px; color:#F2A93B; margin-top:2px;">🕒 Estimated Arrival: <b>${arr2}</b></div>
+           </div>`;
+      }
+    }
+
+    setInterval(updateHeaderClock, 1000);
+    updateHeaderClock();
+
     function resetRouteAndCameras() {
       document.getElementById('originInput').value = '';
       document.getElementById('destInput').value = '';
+      currentRouteParams = null;
 
       if (routeLayers && routeLayers.length > 0) {
         routeLayers.forEach(l => map.removeLayer(l));

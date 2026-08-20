@@ -9,7 +9,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import json
 import os
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 import iot_simulator
@@ -168,7 +168,7 @@ class TrafficAPIHandler(BaseHTTPRequestHandler):
 
 def run_server(port=8000):
     server_address = ('', port)
-    httpd = HTTPServer(server_address, TrafficAPIHandler)
+    httpd = ThreadingHTTPServer(server_address, TrafficAPIHandler)
     print("=================================================================")
     print(f" [+] RoutePulse Global Server running at http://localhost:{port}")
     print(" Press Ctrl+C to stop the server.")
