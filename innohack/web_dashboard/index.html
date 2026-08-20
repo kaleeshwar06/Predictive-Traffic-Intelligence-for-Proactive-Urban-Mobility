@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoutePulse — Live OpenCV CCTV AI Congestion Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0A0E17;
+    --bg-grid: #0D1220;
+    --panel: #121826;
+    --panel-alt: #1A2233;
+    --line: #263047;
+    --line-soft: #1D2536;
+    --text: #E8ECF4;
+    --text-dim: #8B95AB;
+    --text-faint: #576079;
+    --amber: #F2A93B;
+    --amber-dim: #6b5324;
+    --green: #37C871;
+    --green-dim: #17402a;
+    --red: #FF5C5C;
+    --red-dim: #4a2020;
+    --blue: #4C8DFF;
+    --font-display: 'Chakra Petch', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(76,141,255,0.08), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,169,59,0.06), transparent),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .wrap{ max-width: 1400px; margin: 0 auto; }
+
+  /* ===== Header ===== */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    background: linear-gradient(135deg, var(--amber), #c97f1c);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-display); font-weight:700; color:#0A0E17; font-size:16px;
+  }
+  .brand-name{ font-family: var(--font-display); font-weight:700; font-size:19px; letter-spacing:0.5px; }
+  .brand-sub{ font-size:11px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:1px; }
+
+  .header-right{ display:flex; align-items:center; gap:22px; }
+  .status-pill{
+    display:flex; align-items:center; gap:7px;
+    font-family: var(--font-mono); font-size:12px; color: var(--green);
+    padding:6px 12px; background: var(--green-dim); border-radius:20px; border:1px solid rgba(55,200,113,0.3);
+  }
+  .status-dot{ width:7px; height:7px; border-radius:50%; background: var(--green); box-shadow:0 0 8px var(--green); animation: blink 2s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  .clock{ font-family: var(--font-mono); font-size:13px; color: var(--text-dim); }
+
+  /* ===== Search row ===== */
+  .search-row{
+    display:flex; gap:12px; margin-bottom:16px;
+  }
+  .search-field{
+    flex:1; display:flex; align-items:center; gap:10px;
+    background: var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding: 13px 16px;
+  }
+  .search-field.origin{ flex: 0 0 260px; }
+  .search-field svg{ flex-shrink:0; opacity:0.55; }
+  .search-field input{
+    background:none; border:none; outline:none; color:var(--text);
+    font-family: var(--font-body); font-size:14px; width:100%;
+  }
+  .search-field input::placeholder{ color: var(--text-faint); }
+
+  .find-btn{
+    font-family: var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px;
+    background: linear-gradient(135deg, var(--amber), #d18f28);
+    color:#0A0E17; border:none; border-radius:10px; padding: 0 26px;
+    cursor:pointer; display:flex; align-items:center; gap:8px;
+    transition: filter 0.15s, transform 0.15s;
+  }
+  .find-btn:hover{ filter:brightness(1.08); transform: translateY(-1px); }
+
+  /* ===== Grid ===== */
+  .grid{
+    display:grid; grid-template-columns: 1.55fr 1fr; gap:16px; margin-bottom:16px;
+  }
+  @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px 18px 20px;
+  }
+  .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .panel-title{ font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text); display:flex; align-items:center; gap:8px;}
+  .panel-title .eyebrow{ width:3px; height:14px; background:var(--amber); border-radius:2px; display:inline-block; }
+  .panel-meta{ font-family: var(--font-mono); font-size:11px; color:var(--text-faint); }
+
+  /* Video Monitor Frame */
+  .video-container {
+    width: 100%;
+    height: 420px;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .video-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-hud {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    background: rgba(10, 14, 23, 0.85);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--green);
+  }
+
+  .legend-row{ display:flex; gap:18px; margin-top:12px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text-dim); }
+  .legend-dot{ width:9px; height:9px; border-radius:50%; }
+
+  /* ===== Right column ===== */
+  .right-col{ display:flex; flex-direction:column; gap:16px; }
+
+  .density-row{ display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .density-row:last-child{ margin-bottom:0; }
+  .density-icon{
+    width:34px; height:34px; border-radius:8px; background:var(--panel-alt);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .density-info{ flex:1; }
+  .density-top{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px; }
+  .density-label{ color:var(--text); font-weight:500; }
+  .density-count{ font-family:var(--font-mono); color:var(--text-dim); }
+  .density-bar-track{ height:6px; background:var(--panel-alt); border-radius:4px; overflow:hidden; }
+  .density-bar-fill{ height:100%; border-radius:4px; transition: width 0.3s ease; }
+
+  .pcu-total{
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .pcu-total-label{ font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--text-faint); font-family:var(--font-mono); }
+  .pcu-total-val{ font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--amber); }
+
+  /* Congestion pulse gauge */
+  .pulse-wrap{ display:flex; flex-direction:column; align-items:center; padding-top:4px; }
+  .gauge-svg{ width:100%; max-width:230px; }
+  .gauge-center{ text-align:center; margin-top:-64px; }
+  .gauge-value{ font-family:var(--font-display); font-size:36px; font-weight:700; }
+  .gauge-caption{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+  .gauge-state{
+    margin-top:14px; font-family:var(--font-mono); font-size:12px; padding:5px 14px; border-radius:20px;
+  }
+
+  /* ===== Bottom row ===== */
+  .bottom-grid{ display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; }
+  @media (max-width: 980px){ .bottom-grid{ grid-template-columns: 1fr; } }
+
+  .timeline{ position:relative; padding: 26px 6px 6px; }
+  .timeline-track{ position:relative; height:64px; }
+  .timeline-bars{ display:flex; align-items:flex-end; gap:6px; height:64px; }
+  .tbar{ flex:1; border-radius:4px 4px 2px 2px; position:relative; min-width:8px; transition: height 0.5s ease; }
+  .tbar .tbar-tag{
+    position:absolute; top:-20px; left:50%; transform:translateX(-50%);
+    font-family:var(--font-mono); font-size:9.5px; color:var(--text-faint); white-space:nowrap;
+  }
+  .timeline-axis{ display:flex; justify-content:space-between; margin-top:8px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+  .eta-flag{
+    position:absolute; top:-6px; display:flex; flex-direction:column; align-items:center; transform:translateX(-50%);
+  }
+  .eta-flag .flag-line{ width:1px; height:96px; background: var(--blue); opacity:0.5; }
+  .eta-flag .flag-label{ font-family:var(--font-mono); font-size:10px; color:var(--blue); background:rgba(76,141,255,0.12); padding:3px 8px; border-radius:6px; margin-bottom:4px; white-space:nowrap; }
+
+  .predict-note{
+    margin-top:18px; padding:12px 14px; background: var(--panel-alt); border-radius:8px;
+    border-left:3px solid var(--amber); font-size:12.5px; color:var(--text-dim); line-height:1.5;
+  }
+  .predict-note b{ color:var(--text); }
+
+  .route-card{
+    border:1px solid var(--line); border-radius:10px; padding:14px 15px; margin-bottom:10px;
+    background: var(--panel-alt); position:relative; cursor: pointer; transition: all 0.2s;
+  }
+  .route-card:hover{ border-color: var(--blue); }
+  .route-card.best{ border-color: var(--green); box-shadow: 0 0 0 1px rgba(55,200,113,0.15); }
+  .route-card-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .route-name{ font-family:var(--font-display); font-weight:600; font-size:13.5px; display:flex; align-items:center; gap:8px; }
+  .best-tag{
+    font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:0.5px;
+    background: var(--green-dim); color:var(--green); padding:2px 8px; border-radius:12px; border:1px solid rgba(55,200,113,0.3);
+  }
+  .route-stats{ display:flex; gap:18px; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); }
+  .route-stats span b{ color:var(--text); font-weight:600; }
+  .route-congestion-bar{ height:5px; border-radius:3px; background:var(--panel); margin-top:10px; overflow:hidden; }
+  .route-congestion-fill{ height:100%; border-radius:3px; }
+
+  .footer-note{ text-align:center; color:var(--text-faint); font-size:11px; margin-top:18px; font-family:var(--font-mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-mark">RP</div>
+      <div>
+        <div class="brand-name">ROUTEPULSE</div>
+        <div class="brand-sub">OpenCV CCTV Video AI Processor • Innohack AI/ML-09</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="backendStatusPill"><span class="status-dot"></span><span id="backendStatusText">CCTV OPENCV VIDEO STREAM LIVE</span></div>
+      <div class="clock" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- Search row -->
+  <div class="search-row">
+    <div class="search-field origin">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C8DFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+      <input type="text" id="originInput" value="Silk Board Junction, Bengaluru" placeholder="Origin...">
+    </div>
+    <div class="search-field">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      <input type="text" id="destInput" value="Indiranagar 100ft Road, Bengaluru" placeholder="Enter your destination...">
+    </div>
+    <button class="find-btn" id="findRouteBtn" onclick="fetchRouteOptimization()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0A0E17" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      FIND ROUTE
+    </button>
+  </div>
+
+  <!-- Main grid: video monitor + right column -->
+  <div class="grid">
+
+    <!-- Live OpenCV CCTV Video Monitor -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="eyebrow"></span>LIVE CCTV VIDEO AI MONITOR — CAM-3049 SILK BOARD</div>
+        <div class="panel-meta" id="videoMetaText">OPENCV CV2 FRAME-BY-FRAME ANALYTICS</div>
+      </div>
+
+      <div class="video-container">
+        <!-- Live OpenCV CCTV Feed Image -->
+        <img id="cctvVideoFrame" src="http://localhost:8000/api/video/frame" alt="CCTV Feed">
+        <div class="video-hud" id="videoHudText">● REC [CAM-3049 SILK BOARD] | OPENCV AI DETECTOR ACTIVE</div>
+      </div>
+
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:#06B6D4"></span>Motorbike (0.5 PCU)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#F59E0B"></span>Auto-rickshaw (0.8 PCU)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#6366F1"></span>Car (1.0 PCU)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#EF4444"></span>BMTC Bus (3.0 PCU)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#10B981"></span>Truck / LCV (2.5 PCU)</div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="right-col">
+
+      <!-- Vehicle density breakdown driven 100% by CCTV Video Processor -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="eyebrow"></span>CCTV VIDEO VEHICLE BREAKDOWN</div>
+          <div class="panel-meta">LIVE FRAME METRICS</div>
+        </div>
+
+        <div class="density-row">
+          <div class="density-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-9h4l3 9M10 8h5"/></svg>
+          </div>
+          <div class="density-info">
+            <div class="density-top"><span class="density-label">Motorbikes & Autos</span><span class="density-count" id="countBikes">11 units · 0.5/0.8 PCU</span></div>
+            <div class="density-bar-track"><div class="density-bar-fill" id="barBikes" style="width:65%; background:#4C8DFF;"></div></div>
+          </div>
+        </div>
+
+        <div class="density-row">
+          <div class="density-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><path d="M3 13l2-6h14l2 6M5 13h14v4H5z"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>
+          </div>
+          <div class="density-info">
+            <div class="density-top"><span class="density-label">Cars</span><span class="density-count" id="countCars">4 units · 1.0 PCU ea</span></div>
+            <div class="density-bar-track"><div class="density-bar-fill" id="barCars" style="width:50%; background:#F2A93B;"></div></div>
+          </div>
+        </div>
+
+        <div class="density-row">
+          <div class="density-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><rect x="3" y="6" width="18" height="11" rx="1"/><circle cx="7.5" cy="19" r="1.5"/><circle cx="16.5" cy="19" r="1.5"/></svg>
+          </div>
+          <div class="density-info">
+            <div class="density-top"><span class="density-label">BMTC Buses</span><span class="density-count" id="countBuses">2 units · 3.0 PCU ea</span></div>
+            <div class="density-bar-track"><div class="density-bar-fill" id="barBuses" style="width:75%; background:#FF5C5C;"></div></div>
+          </div>
+        </div>
+
+        <div class="density-row">
+          <div class="density-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B95AB" stroke-width="2"><rect x="2" y="8" width="13" height="9" rx="1"/><path d="M15 11h4l3 3v3h-7z"/><circle cx="6" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></svg>
+          </div>
+          <div class="density-info">
+            <div class="density-top"><span class="density-label">Trucks / LCVs</span><span class="density-count" id="countTrucks">1 unit · 2.5 PCU</span></div>
+            <div class="density-bar-track"><div class="density-bar-fill" id="barTrucks" style="width:30%; background:#10B981;"></div></div>
+          </div>
+        </div>
+
+        <div class="pcu-total">
+          <span class="pcu-total-label">Frame PCU Load</span>
+          <span class="pcu-total-val" id="pcuTotalVal">19.5 PCU</span>
+        </div>
+      </div>
+
+      <!-- Congestion pulse gauge driven by video -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="eyebrow"></span>CONGESTION PULSE (VIDEO DRIVEN)</div>
+        </div>
+        <div class="pulse-wrap">
+          <svg class="gauge-svg" viewBox="0 0 220 130">
+            <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#1A2233" stroke-width="16" stroke-linecap="round"/>
+            <path id="gaugeArc" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="url(#pulseGrad)" stroke-width="16" stroke-linecap="round"
+                  stroke-dasharray="283" stroke-dashoffset="100">
+            </path>
+            <defs>
+              <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#37C871"/>
+                <stop offset="55%" stop-color="#F2A93B"/>
+                <stop offset="100%" stop-color="#FF5C5C"/>
+              </linearGradient>
+            </defs>
+            <circle cx="110" cy="110" r="6" fill="#E8ECF4"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-value" id="gaugeValText" style="color:#F2A93B;">65.0%</div>
+            <div class="gauge-caption">Video Frame PCU Load</div>
+          </div>
+          <div class="gauge-state" id="gaugeStateBadge" style="background:var(--amber-dim); color:var(--amber); border:1px solid rgba(242,169,59,0.35);">
+            MODERATE — Live Video Stream
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="bottom-grid">
+
+    <!-- Prediction timeline -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="eyebrow"></span>PREDICTED CONGESTION UNTIL ARRIVAL</div>
+        <div class="panel-meta">ETA 18 MIN</div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-track">
+          <div class="eta-flag" style="left:78%;">
+            <div class="flag-label">YOUR ETA</div>
+            <div class="flag-line"></div>
+          </div>
+          <div class="timeline-bars" id="timelineBars">
+            <div class="tbar" style="height:38%; background:#37C871;"><span class="tbar-tag">Now</span></div>
+            <div class="tbar" style="height:46%; background:#37C871;"></div>
+            <div class="tbar" style="height:55%; background:#F2A93B;"></div>
+            <div class="tbar" style="height:63%; background:#F2A93B;"></div>
+            <div class="tbar" style="height:74%; background:#F2A93B;"></div>
+            <div class="tbar" style="height:85%; background:#FF5C5C;"></div>
+            <div class="tbar" style="height:92%; background:#FF5C5C;"><span class="tbar-tag" style="top:-34px; color:#FF5C5C;">Peak</span></div>
+            <div class="tbar" style="height:80%; background:#FF5C5C;"></div>
+            <div class="tbar" style="height:66%; background:#F2A93B;"></div>
+          </div>
+        </div>
+        <div class="timeline-axis">
+          <span>Now</span><span>+5m</span><span>+10m</span><span>+15m</span><span>+18m (ETA)</span><span>+25m</span>
+        </div>
+      </div>
+
+      <div class="predict-note" id="predictNoteText">
+        CCTV Analytics: Current video frame indicates <b>moderate traffic density</b> with steady flow (Avg Speed: 24.5 km/h). Reroute available to save 24 mins.
+      </div>
+    </div>
+
+    <!-- Alternate routes -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title"><span class="eyebrow"></span>DYNAMIC AI ALTERNATE ROUTES</div>
+      </div>
+
+      <div class="route-card best">
+        <div class="route-card-top">
+          <div class="route-name">🛣️ Via HSR 27th Main & Agara Flyover <span class="best-tag">AI Recommended</span></div>
+        </div>
+        <div class="route-stats">
+          <span><b>34 min</b> ETA (Saved 24m)</span>
+          <span><b>12.4 km</b></span>
+          <span style="color:#37C871;"><b>44%</b> predicted load</span>
+        </div>
+        <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:44%; background:#37C871;"></div></div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-card-top">
+          <div class="route-name">🛣️ Direct Outer Ring Road — Standard</div>
+        </div>
+        <div class="route-stats">
+          <span><b>58 min</b> ETA</span>
+          <span><b>11.2 km</b></span>
+          <span style="color:#FF5C5C;"><b>91%</b> predicted load</span>
+        </div>
+        <div class="route-congestion-bar"><div class="route-congestion-fill" style="width:91%; background:#FF5C5C;"></div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">ROUTEPULSE OPENCV CCTV ENGINE · CONNECTED TO PYTHON BACKEND AT HTTP://LOCALHOST:8000 · INNOHACK AI/ML-09</div>
+
+</div>
+
+<script>
+  const BACKEND_URL = "http://localhost:8000";
+
+  function updateClock(){
+    const now = new Date();
+    document.getElementById('clock').textContent = now.toLocaleTimeString('en-IN', { hour12:false });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Continuously refresh OpenCV CCTV Video Frame
+  function refreshCCTVFrame(){
+    const img = document.getElementById('cctvVideoFrame');
+    if(img){
+      img.src = `${BACKEND_URL}/api/video/frame?t=${Date.now()}`;
+    }
+  }
+
+  // Fetch CCTV Video Calculated Telemetry
+  async function fetchVideoTelemetry(){
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/video/telemetry`);
+      if (res.ok) {
+        const data = await res.json();
+        updateDashboardFromVideoData(data);
+      }
+    } catch(e) {
+      console.log("Error fetching CCTV video telemetry:", e);
+    }
+  }
+
+  function updateDashboardFromVideoData(data){
+    if(!data) return;
+
+    // Update Vehicle Counts calculated directly from Video Processing
+    const counts = data.counts || {};
+    const bikesCount = (counts.bike || 0) + (counts.auto || 0);
+    const carsCount = counts.car || 0;
+    const busesCount = counts.bus || 0;
+    const trucksCount = counts.truck || 0;
+
+    document.getElementById('countBikes').textContent = `${bikesCount} units · 0.5/0.8 PCU`;
+    document.getElementById('countCars').textContent = `${carsCount} units · 1.0 PCU ea`;
+    document.getElementById('countBuses').textContent = `${busesCount} units · 3.0 PCU ea`;
+    document.getElementById('countTrucks').textContent = `${trucksCount} units · 2.5 PCU`;
+
+    // Update PCU Load calculated from Video
+    const pcuVal = data.total_pcu || 15.0;
+    document.getElementById('pcuTotalVal').textContent = `${pcuVal} PCU`;
+
+    // Update Congestion Gauge driven 100% by Video Processing
+    const congestionPct = data.congestion_pct || 50.0;
+    updateGauge(congestionPct);
+
+    // Update HUD text
+    document.getElementById('videoHudText').textContent = 
+      `● REC [CAM-3049 SILK BOARD] | FRAME #${data.frame_index} | VEHICLES: ${data.total_vehicles} | SPEED: ${data.avg_speed_kmh} KM/H`;
+  }
+
+  function updateGauge(pct){
+    const valText = document.getElementById('gaugeValText');
+    const badge = document.getElementById('gaugeStateBadge');
+    valText.textContent = `${pct}%`;
+
+    const dashoffset = 283 - (283 * (pct / 100));
+    document.getElementById('gaugeArc').style.strokeDashoffset = dashoffset;
+
+    if (pct < 45) {
+      valText.style.color = '#37C871';
+      badge.style.background = '#17402a';
+      badge.style.color = '#37C871';
+      badge.style.borderColor = 'rgba(55,200,113,0.35)';
+      badge.textContent = 'CLEAR — Live Video Stream';
+    } else if (pct < 75) {
+      valText.style.color = '#F2A93B';
+      badge.style.background = '#6b5324';
+      badge.style.color = '#F2A93B';
+      badge.style.borderColor = 'rgba(242,169,59,0.35)';
+      badge.textContent = 'MODERATE — Live Video Stream';
+    } else {
+      valText.style.color = '#FF5C5C';
+      badge.style.background = '#4a2020';
+      badge.style.color = '#FF5C5C';
+      badge.style.borderColor = 'rgba(255,92,92,0.35)';
+      badge.textContent = 'HEAVY — Live Video Stream';
+    }
+  }
+
+  async function fetchRouteOptimization(){
+    const origin = document.getElementById('originInput').value;
+    const dest = document.getElementById('destInput').value;
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/route/optimize`);
+      if(res.ok){
+        const data = await res.json();
+        document.getElementById('predictNoteText').innerHTML = 
+          `AI Reroute active via <b>${data.ai_optimized_route.name}</b>. Commute time reduced by <b>${data.ai_optimized_route.time_saved_min} minutes</b> (${data.ai_optimized_route.fuel_saved_liters}L fuel saved).`;
+      }
+    } catch(e) {
+      console.log("Route calculation simulated.");
+    }
+  }
+
+  // Refresh CCTV video frames at ~10 FPS for video stream effect
+  setInterval(refreshCCTVFrame, 100);
+  setInterval(fetchVideoTelemetry, 300);
+</script>
+</body>
+</html>

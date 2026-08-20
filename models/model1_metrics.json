@@ -1,0 +1,52 @@
+{
+  "model_name": "Model 1 \u2014 Multi-Horizon Traffic Forecasting Engine",
+  "dataset": "Enriched Traffic Datasets for Madrid (MTD)",
+  "training_samples": 373689,
+  "test_samples": 49826,
+  "features": [
+    "traffic_intensity",
+    "lag_15m",
+    "lag_30m",
+    "lag_45m",
+    "lag_60m",
+    "rolling_mean_1h",
+    "rolling_std_1h",
+    "temperature",
+    "precipitation",
+    "wind",
+    "lanes",
+    "maxspeed",
+    "length",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "is_weekend",
+    "hw_motorway",
+    "hw_primary",
+    "hw_secondary",
+    "hw_tertiary",
+    "hw_residential"
+  ],
+  "horizons": {
+    "15min": {
+      "mae": 64.59863780404174,
+      "rmse": 99.0135131124058,
+      "r2": 0.9651692491612287,
+      "mape": 16.416014508593438
+    },
+    "30min": {
+      "mae": 82.95330171383955,
+      "rmse": 130.0518130175712,
+      "r2": 0.9399042493168587,
+      "mape": 20.670347189010403
+    },
+    "60min": {
+      "mae": 117.70638184903875,
+      "rmse": 184.8241010693669,
+      "r2": 0.8785993706534915,
+      "mape": 30.315373942710277
+    }
+  },
+  "trained_at": "2026-08-20 14:50:26"
+}

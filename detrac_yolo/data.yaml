@@ -1,0 +1,9 @@
+# UA-DETRAC Dataset Configuration for YOLOv5 / YOLOv8 / YOLOv11
+path: D:/Innohack/detrac_yolo
+train: images/train
+val: images/val
+test: images/test
+
+# Classes (4 standard UA-DETRAC vehicle classes)
+nc: 4
+names: ['car', 'van', 'bus', 'others']

@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+env/
+.venv/
+.env/
+*.env
+
+# Node / JS
+node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Logs
+*.log
+
+# Large data files
+*.zip
+*.tar.gz
+*.tar
+*.rar
+*.7z
+*.h5
+*.pkl
+*.pt
+*.pth
+*.bin
+*.csv
+*.npy
+*.npz
+data/
+datasets/
+Enriched Traffic Datasets for Madrid/

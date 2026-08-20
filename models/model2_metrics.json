@@ -1,0 +1,49 @@
+{
+  "model_name": "Model 2 \u2014 Video to Traffic Flow Computer Vision Engine",
+  "architecture": "YOLO Multi-Class Vehicle Detection + Centroid SORT Tracking",
+  "classes": [
+    "car",
+    "bus",
+    "truck",
+    "bike",
+    "van"
+  ],
+  "metrics": {
+    "overall_precision": 0.9326,
+    "overall_recall": 0.9205,
+    "f1_score": 0.9265,
+    "map_50": 0.9321,
+    "count_accuracy_pct": 90.58946380416968,
+    "count_mae": 1.08,
+    "latency_ms": 1748.0210638046265,
+    "fps": 0.5720754862206674
+  },
+  "class_metrics": {
+    "car": {
+      "precision": 0.9627,
+      "recall": 0.97,
+      "f1": 0.9663
+    },
+    "bus": {
+      "precision": 0.8793,
+      "recall": 0.8361,
+      "f1": 0.8571
+    },
+    "truck": {
+      "precision": 0.8846,
+      "recall": 0.7419,
+      "f1": 0.807
+    },
+    "bike": {
+      "precision": 0.9228,
+      "recall": 0.9153,
+      "f1": 0.919
+    },
+    "van": {
+      "precision": 0.8626,
+      "recall": 0.8433,
+      "f1": 0.8528
+    }
+  },
+  "evaluated_at": "2026-08-20 15:15:19"
+}
