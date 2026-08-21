@@ -1490,9 +1490,22 @@
     }
 
     function clearAllHistory() {
-      if (confirm("Are you sure you want to clear all searched route history?")) {
+      try {
         localStorage.removeItem(HISTORY_KEY);
-        renderHistorySection();
+        localStorage.removeItem('routepulse_searched_routes_v1');
+      } catch(e) {}
+      
+      const countMeta = document.getElementById('historyCountMeta');
+      if (countMeta) countMeta.innerText = '0 SEARCHES';
+
+      const listContainer = document.getElementById('historyListContainer');
+      if (listContainer) {
+        listContainer.innerHTML = `<div style="text-align:center; color:var(--text-faint); font-size:12px; padding:20px;">No search history found.</div>`;
+      }
+
+      renderHistorySection();
+      if (typeof renderCongestionGraph === 'function') {
+        renderCongestionGraph([]);
       }
     }
 

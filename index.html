@@ -1628,9 +1628,22 @@
     }
 
     function clearAllHistory() {
-      if (confirm("Are you sure you want to clear all searched route history?")) {
+      try {
         localStorage.removeItem(HISTORY_KEY);
-        renderHistorySection();
+        localStorage.removeItem('routepulse_searched_routes_v1');
+      } catch(e) {}
+      
+      const countMeta = document.getElementById('historyCountMeta');
+      if (countMeta) countMeta.innerText = '0 SEARCHES';
+
+      const listContainer = document.getElementById('historyListContainer');
+      if (listContainer) {
+        listContainer.innerHTML = `<div style="text-align:center; color:var(--text-faint); font-size:12px; padding:20px;">No search history found.</div>`;
+      }
+
+      renderHistorySection();
+      if (typeof renderCongestionGraph === 'function') {
+        renderCongestionGraph([]);
       }
     }
 
@@ -1963,26 +1976,12 @@
     renderHistorySection();
     setActiveLocationProfile("Piccadilly Circus ➔ Heathrow Airport", 68);
 
-    // Continuously update 24h Congestion graph curve & live NOW indicator over time
+    // Continuously update 24h Congestion graph curve periodically
     setInterval(() => {
       renderAll24hGraphs();
-    }, 2000);
+    }, 30000);
 
   </script>
-
-  <!-- Real-Time Dynamic Moving YOLO Object Detection & PCU Engine for CCTV Feeds -->
-  
-
-
-  <!-- Real-Time YOLO AI Bounding Box Overlay Engine for Live CCTV Footage -->
-  
-  <!-- Real-Time Precision YOLO AI Vehicle Detection Engine for CCTV Footage -->
-  
-  <!-- Real-Time Camera-Calibrated YOLO AI Vehicle Detection Engine for Live CCTV Footage -->
-  
-
-
-
 
   <!-- Real YOLO Inference Telemetry Frontend Sync Engine -->
   <script>
@@ -2036,14 +2035,26 @@
       }
     }
 
-    // Keep live video feed playing continuously without freezing at 10 FPS
-    setInterval(() => {
+    // High-performance smooth non-blocking video frame switcher
+    let isFrameLoading = false;
+    function fetchNextVideoFrame() {
       const img = document.getElementById('liveImg');
-      if (img && img.style.display !== 'none') {
-        img.src = '/api/video/feed?t=' + Date.now();
-      }
-    }, 100);
+      if (!img || img.style.display === 'none') return;
+      if (isFrameLoading) return;
 
+      isFrameLoading = true;
+      const nextImg = new Image();
+      nextImg.onload = () => {
+        img.src = nextImg.src;
+        isFrameLoading = false;
+      };
+      nextImg.onerror = () => {
+        isFrameLoading = false;
+      };
+      nextImg.src = '/api/video/feed?t=' + Date.now();
+    }
+
+    setInterval(fetchNextVideoFrame, 120);
     setInterval(syncYoloTelemetry, 1000);
     syncYoloTelemetry();
   })();
