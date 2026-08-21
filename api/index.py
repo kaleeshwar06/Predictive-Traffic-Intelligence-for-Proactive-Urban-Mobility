@@ -153,6 +153,61 @@ class handler(BaseHTTPRequestHandler):
             self._safe_write(json.dumps(res, indent=2).encode('utf-8'))
             return
 
+        # 5. OpenWeatherMap Live Weather API Endpoint
+        if path == "/api/weather":
+            lat = query.get("lat", ["51.5074"])[0]
+            lon = query.get("lon", ["-0.1278"])[0]
+            api_key = "d9ecf2c22015e1e9780417f4186131b0"
+            weather_data = {
+                "city": "London",
+                "condition": "Clouds",
+                "description": "few clouds",
+                "temp_c": 14.3,
+                "humidity": 81,
+                "wind_m_s": 2.6,
+                "is_rain": False,
+                "rain_mm": 0.0,
+                "icon": "02n"
+            }
+            try:
+                import urllib.request
+                url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=4) as response:
+                    raw = response.read().decode('utf-8')
+                    parsed_w = json.loads(raw)
+                    main_cond = parsed_w.get("weather", [{}])[0].get("main", "Clear")
+                    desc = parsed_w.get("weather", [{}])[0].get("description", "clear sky")
+                    temp = parsed_w.get("main", {}).get("temp", 15.0)
+                    humidity = parsed_w.get("main", {}).get("humidity", 70)
+                    wind = parsed_w.get("wind", {}).get("speed", 2.0)
+                    icon = parsed_w.get("weather", [{}])[0].get("icon", "01d")
+                    rain_obj = parsed_w.get("rain", {})
+                    rain_mm = rain_obj.get("1h", 0.0) if isinstance(rain_obj, dict) else 0.0
+                    is_rain = main_cond.lower() in ["rain", "drizzle", "thunderstorm"] or rain_mm > 0
+
+                    weather_data = {
+                        "city": parsed_w.get("name", "London"),
+                        "condition": main_cond,
+                        "description": desc,
+                        "temp_c": temp,
+                        "humidity": humidity,
+                        "wind_m_s": wind,
+                        "is_rain": is_rain,
+                        "rain_mm": rain_mm,
+                        "icon": icon
+                    }
+            except Exception as e:
+                print(f"[WEATHER API] OpenWeatherMap fetch error: {e}")
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self._send_cors()
+            self.end_headers()
+            self._safe_write(json.dumps(weather_data, indent=2).encode('utf-8'))
+            return
+
         # Default API fallback
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -169,6 +224,16 @@ class handler(BaseHTTPRequestHandler):
             telemetry = dict(res)
             if "jpeg_bytes" in telemetry:
                 del telemetry["jpeg_bytes"]
+            pcu = telemetry.get("total_pcu_load", 0.0)
+            if pcu >= 12.0:
+                telemetry["predicted_status"] = "HEAVY JAM PREDICTED"
+                telemetry["predicted_color"] = "#FF5C5C"
+            elif pcu >= 6.0:
+                telemetry["predicted_status"] = "MODERATE TRAFFIC"
+                telemetry["predicted_color"] = "#F2A93B"
+            else:
+                telemetry["predicted_status"] = "FREE FLOW"
+                telemetry["predicted_color"] = "#37C871"
             return telemetry
 
         # Fallback dynamic telemetry
@@ -176,6 +241,18 @@ class handler(BaseHTTPRequestHandler):
         counts = {"car": 2, "motorbike": 1, "bus": 1, "truck": 0, "van": 1}
         total_pcu = sum(VEHICLE_PCU[k] * v for k, v in counts.items())
         total_weight = sum(VEHICLE_WEIGHTS[k] * v for k, v in counts.items())
+        pcu_val = round(total_pcu, 1)
+        
+        if pcu_val >= 12.0:
+            pred_status = "HEAVY JAM PREDICTED"
+            pred_color = "#FF5C5C"
+        elif pcu_val >= 6.0:
+            pred_status = "MODERATE TRAFFIC"
+            pred_color = "#F2A93B"
+        else:
+            pred_status = "FREE FLOW"
+            pred_color = "#37C871"
+
         return {
             "frame_id": int(time.time() * 10) % 10000,
             "fps": 24.0,
@@ -186,8 +263,10 @@ class handler(BaseHTTPRequestHandler):
             "raw_detections_count": 5,
             "total_tracked_vehicles": 5,
             "vehicle_counts": counts,
-            "total_pcu_load": round(total_pcu, 1),
+            "total_pcu_load": pcu_val,
             "weighted_density": total_weight,
+            "predicted_status": pred_status,
+            "predicted_color": pred_color,
             "tracked_objects": []
         }
 

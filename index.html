@@ -5,28 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ROUTES BY VENOM — Traffic Intelligence Command Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <!-- Leaflet CSS for OSM Map -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <style>
   :root{
-    --bg: #0A0E17;
-    --bg-grid: #0D1220;
-    --panel: #121826;
-    --panel-alt: #1A2233;
-    --line: #263047;
-    --line-soft: #1D2536;
-    --text: #E8ECF4;
-    --text-dim: #8B95AB;
-    --text-faint: #576079;
-    --amber: #F2A93B;
-    --amber-dim: #6b5324;
+    --bg: #131314;
+    --bg-grid: #0E0E0F;
+    --panel: rgba(32, 31, 32, 0.85);
+    --panel-alt: #201F20;
+    --panel-hover: #2A2A2B;
+    --line: #3B494B;
+    --line-soft: rgba(132, 148, 149, 0.2);
+    --text: #E5E2E3;
+    --text-dim: #B9CACB;
+    --text-faint: #849495;
+    --amber: #FEB700;
+    --amber-dim: #6B4B00;
     --green: #37C871;
-    --green-dim: #17402a;
-    --red: #FF5C5C;
-    --red-dim: #4a2020;
-    --blue: #4C8DFF;
-    --font-display: 'Chakra Petch', sans-serif;
+    --green-dim: #17402A;
+    --red: #FF3B30;
+    --red-dim: #690005;
+    --blue: #00F0FF;
+    --blue-glow: rgba(0, 240, 255, 0.35);
+    --purple: #7213FF;
+    --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
   }
@@ -43,22 +46,24 @@
   /* ===== Header ===== */
   header{
     display:flex; align-items:center; justify-content:space-between;
-    padding: 14px 20px;
-    background: var(--panel);
+    padding: 12px 20px;
+    background: rgba(19, 19, 20, 0.95);
+    backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--line);
     z-index: 20;
   }
   .brand{ display:flex; align-items:center; gap:12px; }
   .brand-logo-img {
     width: 38px; height: 38px; border-radius: 8px;
-    object-fit: cover; border: 1.5px solid rgba(0, 229, 255, 0.5);
-    box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
+    object-fit: cover; border: 1.5px solid var(--blue);
+    box-shadow: 0 0 16px var(--blue-glow);
   }
   .brand-mark{
     width:34px; height:34px; border-radius:8px;
-    background: linear-gradient(135deg, var(--amber), #c97f1c);
+    background: linear-gradient(135deg, var(--blue), #0088FF);
     display:flex; align-items:center; justify-content:center;
-    font-family: var(--font-display); font-weight:700; color:#0A0E17; font-size:16px;
+    font-family: var(--font-display); font-weight:700; color:#002022; font-size:16px;
+    box-shadow: 0 0 12px var(--blue-glow);
   }
   .brand-name{ font-family: var(--font-display); font-weight:700; font-size:19px; letter-spacing:0.5px; }
   .brand-sub{ font-size:11px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase; margin-top:1px; }
@@ -67,7 +72,7 @@
   .status-pill{
     display:flex; align-items:center; gap:7px;
     font-family: var(--font-mono); font-size:12px; color: var(--green);
-    padding:6px 12px; background: var(--green-dim); border-radius:20px; border:1px solid rgba(55,200,113,0.3);
+    padding:6px 12px; background: rgba(55,200,113,0.12); border-radius:20px; border:1px solid rgba(55,200,113,0.35);
   }
   .status-dot{ width:7px; height:7px; border-radius:50%; background: var(--green); box-shadow:0 0 8px var(--green); animation: blink 2s infinite; }
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
@@ -75,53 +80,105 @@
   .clock-pill {
     display: flex; align-items: center; gap: 8px;
     font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--amber);
-    padding: 6px 14px; background: rgba(242, 169, 59, 0.1); border-radius: 20px;
-    border: 1px solid rgba(242, 169, 59, 0.35); box-shadow: 0 0 10px rgba(242, 169, 59, 0.15);
+    padding: 6px 14px; background: rgba(254, 183, 0, 0.12); border-radius: 20px;
+    border: 1px solid rgba(254, 183, 0, 0.35); box-shadow: 0 0 10px rgba(254, 183, 0, 0.2);
+  }
+
+  .route-marker-pill-container {
+    background: none !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
   }
 
   /* ===== Main Layout ===== */
-  .main-container { display: flex; flex: 1; overflow: hidden; }
+  .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
 
   /* Map Area */
-  #map { flex: 1; height: 100%; background: #0A0E17; z-index: 1; }
+  #map { flex: 1; height: 100%; background: #0E0E0F; z-index: 1; position: relative; }
+
+  /* Map Camera Filter Controls */
+  .map-camera-toggle-bar {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 1000;
+    display: flex;
+    background: rgba(10, 14, 23, 0.90);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 4px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+  }
+  .cam-toggle-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--font-display);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .cam-toggle-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.06);
+  }
+  .cam-toggle-btn.active {
+    background: rgba(0, 229, 255, 0.15);
+    color: var(--blue);
+    border-color: rgba(0, 229, 255, 0.4);
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+  }
 
   /* Sidebar */
   .sidebar {
-    width: 420px; background: var(--bg); border-left: 1px solid var(--line);
-    display: flex; flex-direction: column; z-index: 10; box-shadow: -4px 0 15px rgba(0,0,0,0.5);
+    width: 400px; background: rgba(19, 19, 20, 0.95); backdrop-filter: blur(20px); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; z-index: 10; box-shadow: -6px 0 25px rgba(0,0,0,0.6);
   }
 
   /* Tab Buttons */
-  .tabs { display: flex; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); background: rgba(32, 31, 32, 0.9); }
   .tab-btn {
-    flex: 1; padding: 16px 0; background: transparent; border: none;
-    color: var(--text-dim); font-family: var(--font-display); font-weight: 600; font-size: 14px; letter-spacing: 0.5px;
+    flex: 1; padding: 15px 0; background: transparent; border: none;
+    color: var(--text-dim); font-family: var(--font-display); font-weight: 600; font-size: 13.5px; letter-spacing: 0.5px;
     cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
   }
-  .tab-btn:hover { color: var(--text); background: var(--panel-alt); }
-  .tab-btn.active { color: var(--amber); border-bottom-color: var(--amber); background: var(--panel-alt); }
+  .tab-btn:hover { color: var(--text); background: var(--panel-hover); }
+  .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); background: var(--panel-hover); text-shadow: 0 0 10px var(--blue-glow); }
 
   /* Tab Content Area */
   .tab-content { padding: 16px; flex: 1; overflow-y: auto; display: none; }
   .tab-content.active { display: block; }
 
   /* Shared Panel Styles (from original UI) */
-  .panel{ background: var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom: 16px; }
+  .panel{ background: rgba(32, 31, 32, 0.85); backdrop-filter: blur(20px); border:1px solid rgba(132, 148, 149, 0.25); border-radius:8px; padding:18px; margin-bottom: 16px; box-shadow: 0 8px 32px 0 rgba(0,0,0,0.4); }
   .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   .panel-title{ font-family:var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text); display:flex; align-items:center; gap:8px;}
-  .panel-title .eyebrow{ width:3px; height:14px; background:var(--amber); border-radius:2px; display:inline-block; }
+  .panel-title .eyebrow{ width:3px; height:14px; background:var(--blue); border-radius:2px; display:inline-block; box-shadow: 0 0 8px var(--blue-glow); }
   .panel-meta{ font-family: var(--font-mono); font-size:11px; color:var(--text-faint); }
 
   /* Video Monitor Frame */
-  .video-container { width: 100%; height: 220px; background: #000; border-radius: 10px; overflow: hidden; position: relative; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+  .video-container { width: 100%; height: 220px; background: #0E0E0F; border-radius: 8px; overflow: hidden; position: relative; border: 1px solid rgba(0, 240, 255, 0.4); box-shadow: 0 0 20px rgba(0, 240, 255, 0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
   .video-container video, .video-container img { width: 100%; height: 100%; object-fit: cover; }
-  .video-hud { position: absolute; top: 12px; left: 14px; background: rgba(10, 14, 23, 0.85); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; color: var(--green); }
+  .video-hud { position: absolute; top: 12px; left: 14px; background: rgba(14, 14, 15, 0.9); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(0, 240, 255, 0.4); font-family: var(--font-mono); font-size: 11px; color: var(--blue); text-shadow: 0 0 8px var(--blue-glow); }
 
   /* History Cards & Badges */
   .history-item-card {
-    background: var(--panel-alt);
+    background: #201F20;
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -129,8 +186,8 @@
     transition: all 0.2s ease;
   }
   .history-item-card:hover {
-    border-color: rgba(242, 169, 59, 0.4);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    border-color: var(--blue);
+    box-shadow: 0 4px 14px rgba(0, 240, 255, 0.2);
   }
   .history-item-top {
     display: flex;
@@ -157,57 +214,60 @@
     color: var(--text-dim);
   }
   .history-delete-btn {
-    background: rgba(255, 92, 92, 0.15);
-    border: 1px solid rgba(255, 92, 92, 0.3);
-    color: #FF5C5C;
+    background: rgba(255, 59, 48, 0.15);
+    border: 1px solid rgba(255, 59, 48, 0.35);
+    color: #FF3B30;
     border-radius: 4px;
-    padding: 3px 8px;
+    padding: 4px 10px;
     font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
   }
   .history-delete-btn:hover {
-    background: #FF5C5C;
+    background: #FF3B30;
     color: #FFF;
   }
   .history-load-btn {
-    background: rgba(76, 141, 255, 0.15);
-    border: 1px solid rgba(76, 141, 255, 0.3);
-    color: #4C8DFF;
+    background: rgba(0, 240, 255, 0.15);
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    color: #00F0FF;
     border-radius: 4px;
-    padding: 3px 8px;
+    padding: 4px 10px;
     font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
   }
   .history-load-btn:hover {
-    background: #4C8DFF;
-    color: #FFF;
+    background: #00F0FF;
+    color: #002022;
+    box-shadow: 0 0 10px var(--blue-glow);
   }
 
   /* Density Rows */
   .density-row{ display:flex; align-items:center; gap:12px; margin-bottom:13px; }
   .density-row:last-child{ margin-bottom:0; }
-  .density-icon{ width:30px; height:30px; border-radius:8px; background:var(--panel-alt); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .density-icon{ width:30px; height:30px; border-radius:6px; background:var(--panel-alt); display:flex; align-items:center; justify-content:center; flex-shrink:0; border: 1px solid var(--line); }
   .density-info{ flex:1; }
   .density-top{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; }
   .density-label{ color:var(--text); font-weight:500; }
   .density-count{ font-family:var(--font-mono); color:var(--text-dim); font-size:11px; }
-  .density-bar-track{ height:6px; background:var(--panel-alt); border-radius:4px; overflow:hidden; }
+  .density-bar-track{ height:6px; background:var(--panel-alt); border-radius:4px; overflow:hidden; border: 1px solid var(--line-soft); }
   .density-bar-fill{ height:100%; border-radius:4px; transition: width 0.3s ease; }
 
   /* Route Planner Tab Inputs & Autocomplete */
   .search-field-wrapper { position: relative; margin-bottom: 12px; }
-  .search-field { display:flex; align-items:center; gap:10px; background: var(--panel); border:1px solid var(--line); border-radius:10px; padding: 13px 16px; margin-bottom: 0; }
-  .search-field:focus-within { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
-  .search-field svg { flex-shrink:0; opacity:0.55; }
+  .search-field { display:flex; align-items:center; gap:10px; background: #131314; border:1px solid var(--line); border-radius:6px; padding: 13px 16px; margin-bottom: 0; transition: all 0.2s; }
+  .search-field:focus-within { border-color: var(--blue); box-shadow: 0 0 12px var(--blue-glow); }
+  .search-field svg { flex-shrink:0; opacity:0.65; color: var(--blue); }
   .search-field input { background:none; border:none; outline:none; color:var(--text); font-family: var(--font-body); font-size:14px; width:100%; }
 
   .autocomplete-results {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    background: #131314; border: 1px solid var(--line); border-radius: 6px;
     max-height: 240px; overflow-y: auto; z-index: 1000;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8); display: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85); display: none;
   }
   .autocomplete-item {
     padding: 10px 14px; font-size: 13px; color: var(--text);
@@ -215,24 +275,24 @@
     display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;
   }
   .autocomplete-item:last-child { border-bottom: none; }
-  .autocomplete-item:hover { background: var(--panel-alt); color: var(--amber); }
+  .autocomplete-item:hover { background: var(--panel-hover); color: var(--blue); }
   .autocomplete-icon {
-    width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; color: var(--amber);
+    width: 16px; height: 16px; flex-shrink: 0; opacity: 0.9; color: var(--blue);
   }
   .autocomplete-text-container { flex: 1; overflow: hidden; }
   .autocomplete-title { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .autocomplete-item:hover .autocomplete-title { color: var(--amber); }
+  .autocomplete-item:hover .autocomplete-title { color: var(--blue); }
   .autocomplete-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
   
-  .find-btn { font-family: var(--font-display); font-weight:600; font-size:14px; letter-spacing:0.5px; background: linear-gradient(135deg, var(--amber), #d18f28); color:#0A0E17; border:none; border-radius:10px; padding: 14px; width: 100%; cursor:pointer; display:flex; align-items:center; justify-content: center; gap:8px; margin-bottom: 16px; margin-top: 6px; }
-  .find-btn:hover { filter:brightness(1.08); transform: translateY(-1px); }
+  .find-btn { font-family: var(--font-display); font-weight:700; font-size:14px; letter-spacing:0.5px; background: linear-gradient(135deg, var(--blue), #0088FF); color:#002022; border:none; border-radius:6px; padding: 14px; width: 100%; cursor:pointer; display:flex; align-items:center; justify-content: center; gap:8px; margin-bottom: 16px; margin-top: 6px; box-shadow: 0 0 18px var(--blue-glow); transition: all 0.2s; }
+  .find-btn:hover { filter:brightness(1.15); transform: translateY(-1px); box-shadow: 0 0 24px rgba(0, 240, 255, 0.6); }
 
   /* Route Cards */
-  .route-card{ border:1px solid var(--line); border-radius:10px; padding:14px 15px; margin-bottom:10px; background: var(--panel-alt); cursor: pointer; transition: all 0.2s; }
-  .route-card.best{ border-color: var(--green); box-shadow: 0 0 0 1px rgba(55,200,113,0.15); }
+  .route-card{ border:1px solid var(--line); border-radius:6px; padding:14px 15px; margin-bottom:10px; background: var(--panel-alt); cursor: pointer; transition: all 0.2s; }
+  .route-card.best{ border-color: var(--green); box-shadow: 0 0 14px rgba(55,200,113,0.25); }
   .route-card-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
   .route-name{ font-family:var(--font-display); font-weight:600; font-size:13.5px; display:flex; align-items:center; gap:8px; }
-  .best-tag{ font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; background: var(--green-dim); color:var(--green); padding:2px 8px; border-radius:12px; border:1px solid rgba(55,200,113,0.3); }
+  .best-tag{ font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; background: var(--green-dim); color:var(--green); padding:2px 8px; border-radius:12px; border:1px solid rgba(55,200,113,0.35); }
   .route-stats{ display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:12px; color:var(--text-dim); }
   .route-congestion-bar{ height:5px; border-radius:3px; background:var(--panel); margin-top:10px; overflow:hidden; }
 
@@ -276,10 +336,21 @@
   }
   .clear-route-btn:hover { background: var(--red-dim); border-color: var(--red); color: #FFF; transform: translateY(-1px); }
 
-  /* Off-route cameras (completely hidden) */
+  /* Off-route cameras - subtle, clean and fully interactive across London */
   .custom-marker.cam-off-route {
-    display: none !important;
-    opacity: 0 !important;
+    background: rgba(10, 14, 23, 0.82) !important;
+    border: 1px solid rgba(76, 141, 255, 0.4) !important;
+    color: #8A9FB9 !important;
+    opacity: 0.7 !important;
+    transform: scale(0.88);
+  }
+  .custom-marker.cam-off-route:hover {
+    opacity: 1 !important;
+    border-color: #00E5FF !important;
+    color: #00E5FF !important;
+    background: #0D1626 !important;
+    transform: scale(1.08);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.5) !important;
   }
 
   /* Interactive What-If Scenario Simulator Panel Styles */
@@ -440,6 +511,24 @@
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--amber);
+  /* Responsive Layout Adaptations */
+  @media (max-width: 900px) {
+    .main-container {
+      flex-direction: column;
+    }
+    .sidebar {
+      width: 100%;
+      height: 450px;
+      border-left: none;
+      border-top: 1px solid var(--line);
+    }
+    #map {
+      height: calc(100vh - 450px - 110px);
+    }
+    .whatif-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
   }
 
 </style>
@@ -500,8 +589,19 @@
   <!-- Main Container -->
   <div class="main-container">
     
-    <!-- Left: OSM Map -->
-    <div id="map"></div>
+    <!-- Left: OSM Map with Camera Filter Controls -->
+    <div id="map">
+      <div class="map-camera-toggle-bar">
+        <button id="btnCamFilterAll" class="cam-toggle-btn active" onclick="setCameraFilter('all')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>ALL CAMERAS</span> (<strong id="camCountBadge" style="color:var(--blue);">0</strong>)
+        </button>
+        <button id="btnCamFilterRoute" class="cam-toggle-btn" onclick="setCameraFilter('route')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span>ROUTE CAMERAS ONLY</span>
+        </button>
+      </div>
+    </div>
 
     <!-- Right: Sidebar -->
     <div class="sidebar">
@@ -724,38 +824,185 @@
 
     let allCamMarkers = [];
     let routeLayers = [];
+    let startPointMarker = null;
+    let endPointMarker = null;
 
-    async function loadTfLCameras() {
-      try {
-        const res = await fetch("https://api.tfl.gov.uk/Place/Type/JamCam");
-        const data = await res.json();
-        
-        let camsLoaded = 0;
-        allCamMarkers = [];
-        data.forEach(cam => {
-          let videoUrl = '', imageUrl = '';
-          if(cam.additionalProperties) {
-            cam.additionalProperties.forEach(p => {
-              if(p.key === 'videoUrl') videoUrl = p.value;
-              if(p.key === 'imageUrl') imageUrl = p.value;
-            });
-          }
-          if((videoUrl || imageUrl) && camsLoaded < 900) {
-            const marker = L.marker([cam.lat, cam.lon], { icon: cctvIcon }).addTo(map);
-            marker.on('click', () => {
-              selectCamera(cam.commonName, videoUrl, imageUrl);
-            });
-            allCamMarkers.push({ marker: marker, lat: cam.lat, lon: cam.lon, name: cam.commonName });
-            camsLoaded++;
-          }
-        });
-        // Initial route calculation & 2-3 hour predictive forecast execution
-        await calculateRoute();
-        run2To3HourPrediction(2);
-      } catch(e) { console.log(e); }
+    function createStartMarkerIcon(label) {
+      const shortName = label ? label.split(',')[0].trim() : 'START';
+      const html = `
+        <div style="
+          background: rgba(15, 23, 42, 0.95);
+          border: 2px solid #3B82F6;
+          box-shadow: 0 0 18px rgba(59, 130, 246, 0.95), 0 4px 12px rgba(0,0,0,0.7);
+          border-radius: 20px;
+          padding: 4px 10px;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 11px;
+          font-family: system-ui, -apple-system, sans-serif;
+          letter-spacing: 0.5px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          cursor: pointer;
+        ">
+          <span style="background:#3B82F6; color:#fff; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow:0 0 8px rgba(59,130,246,1);">A</span>
+          <span style="color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,0.9);">START: ${shortName.toUpperCase()}</span>
+        </div>
+      `;
+      return L.divIcon({
+        className: '',
+        html: html,
+        iconSize: [160, 32],
+        iconAnchor: [80, 16]
+      });
     }
 
-                function selectCamera(name, videoUrl, imageUrl) {
+    function createEndMarkerIcon(label) {
+      const shortName = label ? label.split(',')[0].trim() : 'END';
+      const html = `
+        <div style="
+          background: rgba(15, 23, 42, 0.95);
+          border: 2px solid #EF4444;
+          box-shadow: 0 0 18px rgba(239, 68, 68, 0.95), 0 4px 12px rgba(0,0,0,0.7);
+          border-radius: 20px;
+          padding: 4px 10px;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 11px;
+          font-family: system-ui, -apple-system, sans-serif;
+          letter-spacing: 0.5px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          cursor: pointer;
+        ">
+          <span style="background:#EF4444; color:#fff; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow:0 0 8px rgba(239,68,68,1);">B</span>
+          <span style="color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,0.9);">END: ${shortName.toUpperCase()}</span>
+        </div>
+      `;
+      return L.divIcon({
+        className: '',
+        html: html,
+        iconSize: [160, 32],
+        iconAnchor: [80, 16]
+      });
+    }
+
+    function updateRouteStartEndMarkers(startCoords, startLabel, endCoords, endLabel) {
+      if (startPointMarker) {
+        map.removeLayer(startPointMarker);
+        startPointMarker = null;
+      }
+      if (endPointMarker) {
+        map.removeLayer(endPointMarker);
+        endPointMarker = null;
+      }
+
+      if (startCoords) {
+        const lat = startCoords.lat !== undefined ? startCoords.lat : startCoords[0];
+        const lon = startCoords.lon !== undefined ? startCoords.lon : startCoords[1];
+        startPointMarker = L.marker([lat, lon], {
+          icon: createStartMarkerIcon(startLabel),
+          zIndexOffset: 99999
+        }).addTo(map);
+        startPointMarker.bindPopup(`<b>Start Location</b><br>${startLabel}`);
+      }
+
+      if (endCoords) {
+        const lat = endCoords.lat !== undefined ? endCoords.lat : endCoords[0];
+        const lon = endCoords.lon !== undefined ? endCoords.lon : endCoords[1];
+        endPointMarker = L.marker([lat, lon], {
+          icon: createEndMarkerIcon(endLabel),
+          zIndexOffset: 99999
+        }).addTo(map);
+        endPointMarker.bindPopup(`<b>Destination</b><br>${endLabel}`);
+      }
+    }
+
+    let currentCameraFilter = 'all';
+
+    function setCameraFilter(mode) {
+      currentCameraFilter = mode;
+      const btnAll = document.getElementById('btnCamFilterAll');
+      const btnRoute = document.getElementById('btnCamFilterRoute');
+      if (btnAll) btnAll.classList.toggle('active', mode === 'all');
+      if (btnRoute) btnRoute.classList.toggle('active', mode === 'route');
+
+      updateRouteCameraVisibility(selectedRouteIndex || 0);
+    }
+
+    const FALLBACK_TFL_CAMERAS = [
+      { commonName: "Tower Bridge Road / A1202", lat: 51.5055, lon: -0.0754, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07300.jpg" },
+      { commonName: "Piccadilly Circus / Regent St", lat: 51.5100, lon: -0.1342, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.03601.jpg" },
+      { commonName: "Hyde Park Corner / Park Lane", lat: 51.5033, lon: -0.1517, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.02500.jpg" },
+      { commonName: "Westminster Bridge / Parliament Sq", lat: 51.5008, lon: -0.1246, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.06201.jpg" },
+      { commonName: "Oxford Street / Marble Arch", lat: 51.5132, lon: -0.1586, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.01800.jpg" },
+      { commonName: "Trafalgar Square / Strand", lat: 51.5080, lon: -0.1281, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.04200.jpg" },
+      { commonName: "Blackwall Tunnel North Approach / A12", lat: 51.5103, lon: -0.0076, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.09500.jpg" },
+      { commonName: "A40 Westway / Marylebone Road", lat: 51.5218, lon: -0.1712, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.01200.jpg" },
+      { commonName: "Euston Road / Tottenham Court Rd", lat: 51.5247, lon: -0.1384, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.03100.jpg" },
+      { commonName: "Vauxhall Cross / Wandsworth Rd", lat: 51.4861, lon: -0.1245, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.06800.jpg" },
+      { commonName: "London Bridge / King William St", lat: 51.5079, lon: -0.0877, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07100.jpg" },
+      { commonName: "Aldgate High Street / A11", lat: 51.5141, lon: -0.0741, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.08200.jpg" },
+      { commonName: "King's Cross / Grays Inn Rd", lat: 51.5303, lon: -0.1238, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.03300.jpg" },
+      { commonName: "Elephant and Castle Roundabout", lat: 51.4947, lon: -0.1006, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.06500.jpg" },
+      { commonName: "Hammersmith Flyover / A4", lat: 51.4920, lon: -0.2241, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.00500.jpg" },
+      { commonName: "Old Street Roundabout / A501", lat: 51.5257, lon: -0.0876, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.08400.jpg" },
+      { commonName: "Limehouse Link Tunnel / A1203", lat: 51.5106, lon: -0.0384, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.09100.jpg" },
+      { commonName: "Waterloo Roundabout / York Rd", lat: 51.5031, lon: -0.1132, imageUrl: "https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.06300.jpg" }
+    ];
+
+    async function loadTfLCameras() {
+      allCamMarkers = [];
+      let camsLoaded = 0;
+      try {
+        const res = await fetch("https://api.tfl.gov.uk/Place/Type/JamCam");
+        if (res.ok) {
+          const data = await res.json();
+          data.forEach(cam => {
+            let videoUrl = '', imageUrl = '';
+            if (cam.additionalProperties) {
+              cam.additionalProperties.forEach(p => {
+                if (p.key === 'videoUrl') videoUrl = p.value;
+                if (p.key === 'imageUrl') imageUrl = p.value;
+              });
+            }
+            if ((videoUrl || imageUrl) && camsLoaded < 900) {
+              const marker = L.marker([cam.lat, cam.lon], { icon: cctvIcon }).addTo(map);
+              marker.on('click', () => {
+                selectCamera(cam.commonName, videoUrl, imageUrl);
+              });
+              allCamMarkers.push({ marker: marker, lat: cam.lat, lon: cam.lon, name: cam.commonName });
+              camsLoaded++;
+            }
+          });
+        }
+      } catch(e) {
+        console.log("TfL live JamCam API fetch error, utilizing fallback dataset", e);
+      }
+
+      if (allCamMarkers.length === 0) {
+        FALLBACK_TFL_CAMERAS.forEach(cam => {
+          const marker = L.marker([cam.lat, cam.lon], { icon: cctvIcon }).addTo(map);
+          marker.on('click', () => {
+            selectCamera(cam.commonName, "", cam.imageUrl);
+          });
+          allCamMarkers.push({ marker: marker, lat: cam.lat, lon: cam.lon, name: cam.commonName });
+        });
+      }
+
+      const countBadge = document.getElementById('camCountBadge');
+      if (countBadge) countBadge.innerText = allCamMarkers.length;
+
+      // Initial route calculation & 2-3 hour predictive forecast execution
+      await calculateRoute();
+      run2To3HourPrediction(2);
+    }
+
+    function selectCamera(name, videoUrl, imageUrl) {
       setActiveLocationProfile(`📷 ${name}`, Math.floor(Math.random() * 35) + 40);
 
       switchTab('predictions');
@@ -780,16 +1027,10 @@
           }
         }).catch(err => console.log("Camera select error", err));
 
-      const states = [
-        {text: "FREE FLOW", color: "var(--green)"},
-        {text: "MODERATE TRAFFIC", color: "var(--amber)"},
-        {text: "HEAVY JAM PREDICTED", color: "var(--red)"}
-      ];
-      const state = states[Math.floor(Math.random() * states.length)];
       const forecastEl = document.getElementById('forecastStatus');
-      if (forecastEl) {
-        forecastEl.innerText = state.text;
-        forecastEl.style.color = state.color;
+      if (forecastEl && !forecastEl.innerText.includes("FORECAST (")) {
+        forecastEl.innerText = "CALCULATING FORECAST...";
+        forecastEl.style.color = "var(--text-sub)";
       }
     }
 
@@ -847,23 +1088,27 @@
     }
 
     function updateRouteCameraVisibility(selectedIndex) {
-      if (!globalRoutes || globalRoutes.length === 0 || allCamMarkers.length === 0) return;
+      if (allCamMarkers.length === 0) return;
 
-      const mainRouteGeo = globalRoutes[selectedIndex];
-      const altRouteGeos = globalRoutes.filter((_, idx) => idx !== selectedIndex);
+      let mainCamSet = new Set();
+      let altCamSet = new Set();
 
-      const mainCams = getKeyCamerasForRoute(mainRouteGeo, 5);
-      const mainCamSet = new Set(mainCams.map(c => c.name));
+      if (globalRoutes && globalRoutes.length > 0 && selectedIndex !== undefined && globalRoutes[selectedIndex]) {
+        const mainRouteGeo = globalRoutes[selectedIndex];
+        const altRouteGeos = globalRoutes.filter((_, idx) => idx !== selectedIndex);
 
-      const altCamSet = new Set();
-      altRouteGeos.forEach(geo => {
-        const altCams = getKeyCamerasForRoute(geo, 3);
-        altCams.forEach(c => {
-          if (!mainCamSet.has(c.name)) {
-            altCamSet.add(c.name);
-          }
+        const mainCams = getKeyCamerasForRoute(mainRouteGeo, 5);
+        mainCamSet = new Set(mainCams.map(c => c.name));
+
+        altRouteGeos.forEach(geo => {
+          const altCams = getKeyCamerasForRoute(geo, 3);
+          altCams.forEach(c => {
+            if (!mainCamSet.has(c.name)) {
+              altCamSet.add(c.name);
+            }
+          });
         });
-      });
+      }
 
       allCamMarkers.forEach(item => {
         const markerEl = item.marker.getElement();
@@ -884,8 +1129,13 @@
           markerEl.style.display = "block";
         } else {
           innerEl.classList.add('cam-off-route');
-          markerEl.style.zIndex = "100";
-          markerEl.style.display = "none";
+          if (currentCameraFilter === 'route' && mainCamSet.size > 0) {
+            markerEl.style.zIndex = "100";
+            markerEl.style.display = "none";
+          } else {
+            markerEl.style.zIndex = "500";
+            markerEl.style.display = "block";
+          }
         }
       });
     }
@@ -963,6 +1213,18 @@
         routeLayers.push(mainLayer);
 
         map.fitBounds(mainLayer.getBounds(), { padding: [60, 60] });
+
+        // Update Start Point and End Point markers cleanly on map from active route GeoJSON coordinates
+        if (activeGeos[index] && activeGeos[index].coordinates && activeGeos[index].coordinates.length > 0) {
+          const coords = activeGeos[index].coordinates;
+          const startPt = { lat: coords[0][1], lon: coords[0][0] };
+          const endPt = { lat: coords[coords.length - 1][1], lon: coords[coords.length - 1][0] };
+
+          const origVal = document.getElementById('originInput')?.value || "Piccadilly Circus";
+          const destVal = document.getElementById('destInput')?.value || "Heathrow Airport";
+
+          updateRouteStartEndMarkers(startPt, origVal, endPt, destVal);
+        }
       }
 
       // Reset sidebar card styles
@@ -997,20 +1259,44 @@
       btn.innerHTML = "CALCULATING ROAD NETWORK...";
 
       try {
+        const LANDMARK_COORDS = {
+          'piccadilly circus': { lat: 51.5101, lon: -0.1342 },
+          'heathrow': { lat: 51.4700, lon: -0.4543 },
+          'heathrow airport': { lat: 51.4700, lon: -0.4543 },
+          'westminster abbey': { lat: 51.4993, lon: -0.1273 },
+          'westminster abbey, london': { lat: 51.4993, lon: -0.1273 },
+          'tower bridge': { lat: 51.5055, lon: -0.0754 },
+          'tower bridge, london': { lat: 51.5055, lon: -0.0754 },
+          'london eye': { lat: 51.5033, lon: -0.1195 },
+          'big ben': { lat: 51.5007, lon: -0.1246 },
+          'trafalgar square': { lat: 51.5080, lon: -0.1281 }
+        };
+
         const geocode = async (query) => {
-          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
-          const data = await res.json();
-          return data.length > 0 ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+          if (!query) return null;
+          const qNorm = query.toLowerCase().trim();
+          if (LANDMARK_COORDS[qNorm]) return LANDMARK_COORDS[qNorm];
+          for (const k in LANDMARK_COORDS) {
+            if (qNorm.includes(k)) return LANDMARK_COORDS[k];
+          }
+
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`);
+            const data = await res.json();
+            if (data && data.length > 0) {
+              return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+            }
+          } catch (e) {
+            console.warn("Geocoding fetch warning:", e);
+          }
+          return { lat: 51.5074, lon: -0.1278 };
         };
 
         const start = await geocode(origin);
         const end = await geocode(dest);
 
-        if (!start || !end) {
-          alert("Could not locate one of the points. Try 'Piccadilly Circus' and 'Heathrow'.");
-          btn.innerHTML = origText;
-          return;
-        }
+        // Place Start Point and End Point markers cleanly on the map
+        updateRouteStartEndMarkers(start, origin, end, dest);
 
         // Generate midpoints to FORCE entirely different routes from OSRM
         const latDiff = end.lat - start.lat;
@@ -1285,40 +1571,72 @@
       updateSimulationMapMarkers();
     }
 
-    // ===== Live London Weather via Open-Meteo API (No API Key Required) =====
+    // ===== Live OpenWeatherMap API Integration via Backend /api/weather =====
     async function fetchLondonWeatherForecast(hoursAhead) {
       try {
-        // London coordinates: 51.5074°N, -0.1278°W
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current_weather=true&hourly=precipitation_probability,rain,weathercode&timezone=Europe%2FLondon&forecast_days=1`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Weather API unavailable');
-        const data = await res.json();
+        let lat = 51.5074;
+        let lon = -0.1278;
+        if (currentRouteParams && currentRouteParams.startLat) {
+          lat = currentRouteParams.startLat;
+          lon = currentRouteParams.startLng;
+        }
+        const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        if (!res.ok) throw new Error('Backend weather API unavailable');
+        const weatherData = await res.json();
 
-        // Get current hour in London time
-        const now = new Date();
-        const londonHour = parseInt(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(now));
-        const targetIdx = Math.min(23, londonHour + hoursAhead);
-
-        const rainProb = data.hourly && data.hourly.precipitation_probability ? data.hourly.precipitation_probability[targetIdx] : 0;
-        const rainMm = data.hourly && data.hourly.rain ? data.hourly.rain[targetIdx] : 0;
-        const wCode = data.hourly && data.hourly.weathercode ? data.hourly.weathercode[targetIdx] : 0;
-        const currentCode = data.current_weather ? data.current_weather.weathercode : 0;
-
-        // WMO weather codes: >=51 = drizzle/rain, >=61 = rain, >=80 = showers
-        const isRainingNow = currentCode >= 51;
-        const isRainExpected = rainProb > 40 || rainMm > 0.2 || wCode >= 51;
+        const isRainingNow = weatherData.is_rain;
+        const isRainExpected = isRainingNow || (weatherData.rain_mm > 0) || (hoursAhead === 2 && weatherData.humidity > 75);
 
         return {
-          rainProbability: rainProb,
-          rainMmExpected: rainMm,
-          isRainingNow,
-          isRainExpected,
+          city: weatherData.city || 'London',
+          tempC: weatherData.temp_c,
+          condition: weatherData.condition,
+          description: weatherData.description,
+          humidity: weatherData.humidity,
+          windSpeed: weatherData.wind_m_s,
+          rainProbability: isRainingNow ? 100 : (weatherData.humidity > 80 ? 65 : 25),
+          rainMmExpected: weatherData.rain_mm,
+          isRainingNow: isRainingNow,
+          isRainExpected: isRainExpected,
           source: 'LIVE',
-          dataTag: `Open-Meteo API | London ${rainProb}% rain probability`
+          dataTag: `OpenWeatherMap Live API | ${weatherData.city} (${weatherData.condition}, ${weatherData.temp_c}°C)`
         };
       } catch (e) {
-        // Graceful fallback: use hash-based heuristic if API unavailable
-        return { rainProbability: 0, rainMmExpected: 0, isRainingNow: false, isRainExpected: null, source: 'FALLBACK', dataTag: 'Estimated (Weather API unavailable)' };
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current_weather=true&hourly=precipitation_probability,rain,weathercode&timezone=Europe%2FLondon&forecast_days=1`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Weather API unavailable');
+          const data = await res.json();
+
+          const now = new Date();
+          const londonHour = parseInt(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(now));
+          const targetIdx = Math.min(23, londonHour + hoursAhead);
+
+          const rainProb = data.hourly && data.hourly.precipitation_probability ? data.hourly.precipitation_probability[targetIdx] : 0;
+          const rainMm = data.hourly && data.hourly.rain ? data.hourly.rain[targetIdx] : 0;
+          const wCode = data.hourly && data.hourly.weathercode ? data.hourly.weathercode[targetIdx] : 0;
+          const currentCode = data.current_weather ? data.current_weather.weathercode : 0;
+
+          const isRainingNow = currentCode >= 51;
+          const isRainExpected = rainProb > 40 || rainMm > 0.2 || wCode >= 51;
+
+          return {
+            city: 'London',
+            tempC: data.current_weather ? data.current_weather.temperature : 15,
+            condition: isRainingNow ? 'Rain' : 'Clear',
+            description: isRainingNow ? 'drizzle/rain' : 'clear sky',
+            humidity: 70,
+            windSpeed: 3.5,
+            rainProbability: rainProb,
+            rainMmExpected: rainMm,
+            isRainingNow,
+            isRainExpected,
+            source: 'LIVE',
+            dataTag: `Open-Meteo API | London ${rainProb}% rain probability`
+          };
+        } catch (err) {
+          return { city: 'London', tempC: 15, condition: 'Clear', description: 'clear sky', humidity: 50, windSpeed: 2.0, rainProbability: 0, rainMmExpected: 0, isRainingNow: false, isRainExpected: null, source: 'FALLBACK', dataTag: 'Estimated (Weather API unavailable)' };
+        }
       }
     }
 
@@ -1578,6 +1896,7 @@
         routeLayers = [];
       }
       globalRoutes = [];
+      updateRouteStartEndMarkers(null, null, null, null);
 
       const resultsPanel = document.getElementById('routeResults');
       if (resultsPanel) resultsPanel.style.display = 'none';
@@ -2029,6 +2348,30 @@
 
           const barBuses = document.getElementById('barBuses');
           if (barBuses) barBuses.style.width = Math.min(100, busesAndTrucks * 20) + '%';
+        }
+
+        // 3. Update Model 1 Forecast prediction status dynamically based on live YOLO PCU load
+        const forecastEl = document.getElementById('forecastStatus');
+        if (forecastEl && data.total_pcu_load !== undefined) {
+          if (!forecastEl.innerText.includes("FORECAST (")) {
+            const pcu = data.total_pcu_load;
+            let statusText = "FREE FLOW";
+            let statusColor = "#37C871";
+
+            if (data.predicted_status) {
+              statusText = data.predicted_status;
+              statusColor = data.predicted_color || (pcu >= 12.0 ? "#FF5C5C" : pcu >= 6.0 ? "#F2A93B" : "#37C871");
+            } else if (pcu >= 12.0) {
+              statusText = "HEAVY JAM PREDICTED";
+              statusColor = "#FF5C5C";
+            } else if (pcu >= 6.0) {
+              statusText = "MODERATE TRAFFIC";
+              statusColor = "#F2A93B";
+            }
+
+            forecastEl.innerText = statusText;
+            forecastEl.style.color = statusColor;
+          }
         }
       } catch (e) {
         // Silently handle telemetry polling when backend restarting

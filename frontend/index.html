@@ -79,6 +79,16 @@
     border: 1px solid rgba(242, 169, 59, 0.35); box-shadow: 0 0 10px rgba(242, 169, 59, 0.15);
   }
 
+  .route-marker-pill-container {
+    background: none !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
+  }
+
   /* ===== Main Layout ===== */
   .main-container { display: flex; flex: 1; overflow: hidden; }
 
@@ -714,6 +724,103 @@
 
     let allCamMarkers = [];
     let routeLayers = [];
+    let startPointMarker = null;
+    let endPointMarker = null;
+
+    function createStartMarkerIcon(label) {
+      const shortName = label ? label.split(',')[0].trim() : 'START';
+      const html = `
+        <div style="
+          background: rgba(15, 23, 42, 0.95);
+          border: 2px solid #3B82F6;
+          box-shadow: 0 0 18px rgba(59, 130, 246, 0.95), 0 4px 12px rgba(0,0,0,0.7);
+          border-radius: 20px;
+          padding: 4px 10px;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 11px;
+          font-family: system-ui, -apple-system, sans-serif;
+          letter-spacing: 0.5px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          cursor: pointer;
+        ">
+          <span style="background:#3B82F6; color:#fff; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow:0 0 8px rgba(59,130,246,1);">A</span>
+          <span style="color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,0.9);">START: ${shortName.toUpperCase()}</span>
+        </div>
+      `;
+      return L.divIcon({
+        className: '',
+        html: html,
+        iconSize: [160, 32],
+        iconAnchor: [80, 16]
+      });
+    }
+
+    function createEndMarkerIcon(label) {
+      const shortName = label ? label.split(',')[0].trim() : 'END';
+      const html = `
+        <div style="
+          background: rgba(15, 23, 42, 0.95);
+          border: 2px solid #EF4444;
+          box-shadow: 0 0 18px rgba(239, 68, 68, 0.95), 0 4px 12px rgba(0,0,0,0.7);
+          border-radius: 20px;
+          padding: 4px 10px;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 11px;
+          font-family: system-ui, -apple-system, sans-serif;
+          letter-spacing: 0.5px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          cursor: pointer;
+        ">
+          <span style="background:#EF4444; color:#fff; border-radius:50%; width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; box-shadow:0 0 8px rgba(239,68,68,1);">B</span>
+          <span style="color:#FFFFFF; text-shadow:0 1px 3px rgba(0,0,0,0.9);">END: ${shortName.toUpperCase()}</span>
+        </div>
+      `;
+      return L.divIcon({
+        className: '',
+        html: html,
+        iconSize: [160, 32],
+        iconAnchor: [80, 16]
+      });
+    }
+
+    function updateRouteStartEndMarkers(startCoords, startLabel, endCoords, endLabel) {
+      if (startPointMarker) {
+        map.removeLayer(startPointMarker);
+        startPointMarker = null;
+      }
+      if (endPointMarker) {
+        map.removeLayer(endPointMarker);
+        endPointMarker = null;
+      }
+
+      if (startCoords) {
+        const lat = startCoords.lat !== undefined ? startCoords.lat : startCoords[0];
+        const lon = startCoords.lon !== undefined ? startCoords.lon : startCoords[1];
+        startPointMarker = L.marker([lat, lon], {
+          icon: createStartMarkerIcon(startLabel),
+          zIndexOffset: 99999
+        }).addTo(map);
+        startPointMarker.bindPopup(`<b>Start Location</b><br>${startLabel}`);
+      }
+
+      if (endCoords) {
+        const lat = endCoords.lat !== undefined ? endCoords.lat : endCoords[0];
+        const lon = endCoords.lon !== undefined ? endCoords.lon : endCoords[1];
+        endPointMarker = L.marker([lat, lon], {
+          icon: createEndMarkerIcon(endLabel),
+          zIndexOffset: 99999
+        }).addTo(map);
+        endPointMarker.bindPopup(`<b>Destination</b><br>${endLabel}`);
+      }
+    }
 
     async function loadTfLCameras() {
       try {
@@ -767,16 +874,10 @@
           }
         }).catch(err => console.log("Camera select error", err));
 
-      const states = [
-        {text: "FREE FLOW", color: "var(--green)"},
-        {text: "MODERATE TRAFFIC", color: "var(--amber)"},
-        {text: "HEAVY JAM PREDICTED", color: "var(--red)"}
-      ];
-      const state = states[Math.floor(Math.random() * states.length)];
       const forecastEl = document.getElementById('forecastStatus');
-      if (forecastEl) {
-        forecastEl.innerText = state.text;
-        forecastEl.style.color = state.color;
+      if (forecastEl && !forecastEl.innerText.includes("FORECAST (")) {
+        forecastEl.innerText = "CALCULATING FORECAST...";
+        forecastEl.style.color = "var(--text-sub)";
       }
     }
 
@@ -950,6 +1051,18 @@
         routeLayers.push(mainLayer);
 
         map.fitBounds(mainLayer.getBounds(), { padding: [60, 60] });
+
+        // Update Start Point and End Point markers cleanly on map from active route GeoJSON coordinates
+        if (activeGeos[index] && activeGeos[index].coordinates && activeGeos[index].coordinates.length > 0) {
+          const coords = activeGeos[index].coordinates;
+          const startPt = { lat: coords[0][1], lon: coords[0][0] };
+          const endPt = { lat: coords[coords.length - 1][1], lon: coords[coords.length - 1][0] };
+
+          const origVal = document.getElementById('originInput')?.value || "Piccadilly Circus";
+          const destVal = document.getElementById('destInput')?.value || "Heathrow Airport";
+
+          updateRouteStartEndMarkers(startPt, origVal, endPt, destVal);
+        }
       }
 
       // Reset sidebar card styles
@@ -998,6 +1111,9 @@
           btn.innerHTML = origText;
           return;
         }
+
+        // Place Start Point and End Point markers cleanly on the map
+        updateRouteStartEndMarkers(start, origin, end, dest);
 
         // Generate midpoints to FORCE entirely different routes from OSRM
         const latDiff = end.lat - start.lat;
@@ -1440,6 +1556,7 @@
         routeLayers = [];
       }
       globalRoutes = [];
+      updateRouteStartEndMarkers(null, null, null, null);
 
       const resultsPanel = document.getElementById('routeResults');
       if (resultsPanel) resultsPanel.style.display = 'none';
@@ -1883,6 +2000,30 @@
 
           const barBuses = document.getElementById('barBuses');
           if (barBuses) barBuses.style.width = Math.min(100, busesAndTrucks * 20) + '%';
+        }
+
+        // 3. Update Model 1 Forecast prediction status dynamically based on live YOLO PCU load
+        const forecastEl = document.getElementById('forecastStatus');
+        if (forecastEl && data.total_pcu_load !== undefined) {
+          if (!forecastEl.innerText.includes("FORECAST (")) {
+            const pcu = data.total_pcu_load;
+            let statusText = "FREE FLOW";
+            let statusColor = "#37C871";
+
+            if (data.predicted_status) {
+              statusText = data.predicted_status;
+              statusColor = data.predicted_color || (pcu >= 12.0 ? "#FF5C5C" : pcu >= 6.0 ? "#F2A93B" : "#37C871");
+            } else if (pcu >= 12.0) {
+              statusText = "HEAVY JAM PREDICTED";
+              statusColor = "#FF5C5C";
+            } else if (pcu >= 6.0) {
+              statusText = "MODERATE TRAFFIC";
+              statusColor = "#F2A93B";
+            }
+
+            forecastEl.innerText = statusText;
+            forecastEl.style.color = statusColor;
+          }
         }
       } catch (e) {
         // Silently handle telemetry polling when backend restarting
