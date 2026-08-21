@@ -142,6 +142,48 @@
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
   }
 
+  /* Map Theme Toggle Bar (Left Corner) */
+  .map-theme-toggle-bar {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 1000;
+    display: flex;
+    background: rgba(10, 14, 23, 0.90);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 4px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+  }
+  .theme-toggle-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--font-display);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.06);
+  }
+  .theme-toggle-btn.active {
+    background: rgba(0, 229, 255, 0.15);
+    color: var(--blue);
+    border-color: rgba(0, 229, 255, 0.4);
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+  }
+
   /* Sidebar */
   .sidebar {
     width: 400px; background: rgba(19, 19, 20, 0.95); backdrop-filter: blur(20px); border-left: 1px solid var(--line);
@@ -591,6 +633,18 @@
     
     <!-- Left: OSM Map with Camera Filter Controls -->
     <div id="map">
+      <!-- Map Theme Toggle Switch (Left Corner) -->
+      <div class="map-theme-toggle-bar">
+        <button id="btnMapDark" class="theme-toggle-btn active" onclick="setMapTheme('dark')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span>DARK MAP</span>
+        </button>
+        <button id="btnMapLight" class="theme-toggle-btn" onclick="setMapTheme('light')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <span>LIGHT MAP</span>
+        </button>
+      </div>
+
       <div class="map-camera-toggle-bar">
         <button id="btnCamFilterAll" class="cam-toggle-btn active" onclick="setCameraFilter('all')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -693,7 +747,7 @@
         <div class="search-field-wrapper">
           <div class="search-field">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C8DFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-            <input type="text" id="originInput" value="Piccadilly Circus, London" placeholder="Type origin location..." autocomplete="off">
+            <input type="text" id="originInput" value="" placeholder="Type origin location..." autocomplete="off">
             <button type="button" class="clear-input-btn" onclick="clearInput('originInput', 'originResults')" title="Clear origin">&times;</button>
           </div>
           <div class="autocomplete-results" id="originResults"></div>
@@ -702,7 +756,7 @@
         <div class="search-field-wrapper">
           <div class="search-field">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2"><path d="M12 2C8 2 5 5 5 9c0 5 7 13 7 13s7-8 7-13c0-4-3-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-            <input type="text" id="destInput" value="Heathrow Airport, London" placeholder="Type destination location..." autocomplete="off">
+            <input type="text" id="destInput" value="" placeholder="Type destination location..." autocomplete="off">
             <button type="button" class="clear-input-btn" onclick="clearInput('destInput', 'destResults')" title="Clear destination">&times;</button>
           </div>
           <div class="autocomplete-results" id="destResults"></div>
@@ -810,11 +864,41 @@
     const map = L.map('map', { zoomControl: false }).setView([51.5074, -0.1278], 11);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    const darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OSM contributors &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19
-    }).addTo(map);
+    });
+
+    const lightTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OSM contributors &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19
+    });
+
+    // Default to dark map theme
+    darkTileLayer.addTo(map);
+    let currentMapTheme = 'dark';
+
+    function setMapTheme(theme) {
+      if (theme === currentMapTheme) return;
+      currentMapTheme = theme;
+
+      const btnDark = document.getElementById('btnMapDark');
+      const btnLight = document.getElementById('btnMapLight');
+
+      if (theme === 'light') {
+        map.removeLayer(darkTileLayer);
+        lightTileLayer.addTo(map);
+        if (btnDark) btnDark.classList.remove('active');
+        if (btnLight) btnLight.classList.add('active');
+      } else {
+        map.removeLayer(lightTileLayer);
+        darkTileLayer.addTo(map);
+        if (btnLight) btnLight.classList.remove('active');
+        if (btnDark) btnDark.classList.add('active');
+      }
+    }
 
     const cctvIconHtml = `<div class="custom-marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> CCTV AI</div>`;
     const cctvIcon = L.divIcon({ className: '', html: cctvIconHtml, iconSize: [80, 28], iconAnchor: [40, 14] });
@@ -996,10 +1080,6 @@
 
       const countBadge = document.getElementById('camCountBadge');
       if (countBadge) countBadge.innerText = allCamMarkers.length;
-
-      // Initial route calculation & 2-3 hour predictive forecast execution
-      await calculateRoute();
-      run2To3HourPrediction(2);
     }
 
     function selectCamera(name, videoUrl, imageUrl) {
@@ -1247,7 +1327,7 @@
     function getFutureTimeStr(minutesToAdd) {
       const d = new Date();
       d.setMinutes(d.getMinutes() + minutesToAdd);
-      return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
     }
 
     async function calculateRoute() {
@@ -1255,8 +1335,14 @@
       const dest = document.getElementById('destInput').value;
 
       const btn = document.querySelector('.find-btn');
-      const origText = btn.innerHTML;
-      btn.innerHTML = "CALCULATING ROAD NETWORK...";
+      const origText = btn ? btn.innerHTML : '';
+
+      if (!origin || !dest) {
+        if (btn) btn.innerHTML = origText;
+        return;
+      }
+
+      if (btn) btn.innerHTML = "CALCULATING ROAD NETWORK...";
 
       try {
         const LANDMARK_COORDS = {
@@ -1353,7 +1439,7 @@
         setActiveLocationProfile(`${shortOrig} ➔ ${shortDest}`, optimizedCongestion);
 
         const now = new Date();
-        const timestampStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ', ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timestampStr = now.toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: 'short' }) + ', ' + now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
 
         saveHistoryItem({
           id: Date.now().toString(),
@@ -1662,7 +1748,9 @@
       }
 
       const now = new Date();
-      const targetHour = (now.getHours() + hoursAhead) % 24;
+      const londonHourStr = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hour12: false });
+      const currentLondonHour = parseInt(londonHourStr, 10);
+      const targetHour = (currentLondonHour + hoursAhead) % 24;
 
       // 1. Fetch 24-hour historical congestion pattern for the target hour
       const hourlyData = generate24HourCongestionData();
@@ -1791,7 +1879,7 @@
 
     function updateHeaderClock() {
       const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const timeStr = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const clockEl = document.getElementById('headerLiveClock');
       if (clockEl) {
         clockEl.innerText = timeStr;
@@ -1804,7 +1892,7 @@
     function calculateArrival(minutesToAdd) {
       const d = new Date();
       d.setMinutes(d.getMinutes() + minutesToAdd);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
     }
 
     function renderRouteETACards() {
@@ -1986,8 +2074,8 @@
     }
 
     // ===== Dynamic 24-Hour Traffic Congestion Engine =====
-    let activeLocationName = "Piccadilly Circus ➔ Heathrow Airport";
-    let activeLocationBaseCongestion = 68;
+    let activeLocationName = "Central London Grid";
+    let activeLocationBaseCongestion = 0;
 
     function setActiveLocationProfile(locationName, baseCongestion) {
       if (locationName) activeLocationName = locationName;
@@ -2066,10 +2154,12 @@
       const chartW = containerWidth - paddingLeft - paddingRight;
       const chartH = containerHeight - paddingTop - paddingBottom;
 
-      // Current Time Calculation
+      // Current Time Calculation (London Timezone)
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
+      const londonTimeStr = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
+      const [currentHourStr, currentMinStr] = londonTimeStr.split(':');
+      const currentHour = parseInt(currentHourStr, 10);
+      const currentMin = parseInt(currentMinStr, 10);
       const timeFraction = (currentHour + currentMin / 60) / 23;
       const currentX = paddingLeft + Math.min(1, Math.max(0, timeFraction)) * chartW;
       
@@ -2293,7 +2383,7 @@
     // Initialize Map and load full global state/city dataset
     loadTfLCameras();
     renderHistorySection();
-    setActiveLocationProfile("Piccadilly Circus ➔ Heathrow Airport", 68);
+    setActiveLocationProfile("Central London Grid", 0);
 
     // Continuously update 24h Congestion graph curve periodically
     setInterval(() => {
