@@ -1,0 +1,38 @@
+======================================================================
+         HOW TO RUN ROUTEPULSE TRAFFIC DASHBOARD IN VS CODE
+======================================================================
+
+METHOD 1: RUN BACKEND SERVER (RECOMMENDED - FULL AI & WEATHER FEATURES)
+----------------------------------------------------------------------
+1. Open VS Code and open this project folder:
+   File -> Open Folder -> Select "Innohack"
+
+2. Open a Terminal in VS Code:
+   Press (Ctrl + `) OR go to top menu: Terminal -> New Terminal
+
+3. Run the Python backend server command:
+   python api/index.py
+
+4. Open your web browser (Chrome / Edge) or VS Code Simple Browser and navigate to:
+   http://localhost:8000
+
+----------------------------------------------------------------------
+
+METHOD 2: OPEN DASHBOARD VIA LIVE SERVER (FRONTEND ONLY)
+----------------------------------------------------------------------
+1. Install the "Live Server" extension in VS Code (by extension ID: ms-vscode.live-server).
+2. Right-click on index.html in the VS Code File Explorer.
+3. Click "Open with Live Server" (runs on http://127.0.0.1:5500/index.html).
+
+OR double-click index.html directly in Windows File Explorer.
+
+----------------------------------------------------------------------
+
+QUICK TERMINAL COMMANDS (Copy & Paste in VS Code Terminal):
+----------------------------------------------------------------------
+# Command to run the application:
+python api/index.py
+
+# Open in Browser:
+http://localhost:8000
+======================================================================
